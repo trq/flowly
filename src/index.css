@@ -1,0 +1,7 @@
+@import "tailwindcss";
+
+:root {
+  --page-bg: #161616;
+  --content-border: #303030;
+  --helper-border: none;
+}
