@@ -1,0 +1,14 @@
+# ignore all dot files.
+.*
+
+node_modules/
+/dist
+
+# secrets
+.env
+.env.local
+.env.*.local
+
+# don't ignore
+!.gitignore
+!.env.example
