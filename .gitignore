@@ -12,3 +12,5 @@ node_modules/
 # don't ignore
 !.gitignore
 !.env.example
+!.agents
+!.claude
