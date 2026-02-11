@@ -1,24 +1,19 @@
 {
   "name": "flowly",
   "private": true,
-  "version": "0.0.0",
-  "type": "module",
+  "packageManager": "bun@1.3.5",
+  "workspaces": [
+    "web",
+    "api"
+  ],
   "scripts": {
-    "dev": "vite",
-    "build": "tsc && vite build",
-    "preview": "vite preview"
-  },
-  "dependencies": {
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "tailwindcss": "^4.1.18"
-  },
-  "devDependencies": {
-    "@tailwindcss/vite": "^4.1.18",
-    "@types/react": "^19.0.0",
-    "@types/react-dom": "^19.0.0",
-    "@vitejs/plugin-react": "^5.0.0",
-    "typescript": "~5.8.3",
-    "vite": "^7.0.0"
+    "dev": "bun run dev:web",
+    "dev:web": "bun run --filter @flowly/web dev",
+    "dev:api": "bun run --if-present --filter @flowly/api dev",
+    "dev:all": "bun run --workspaces --if-present dev",
+    "build": "bun run --workspaces --if-present build",
+    "build:web": "bun run --filter @flowly/web build",
+    "build:api": "bun run --if-present --filter @flowly/api build",
+    "preview:web": "bun run --filter @flowly/web preview"
   }
 }
