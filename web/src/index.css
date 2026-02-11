@@ -8,6 +8,10 @@
   --page-bg: #161616;
   --content-border: #303030;
   --helper-border: none;
+  --surface-bg: var(--card);
+  --surface-border-color: var(--content-border);
+  --surface-border-width: 1px;
+  --surface-input-bg: transparent;
   --radius: 0.625rem;
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
@@ -84,6 +88,10 @@
 }
 
 .dark {
+  --surface-bg: var(--card);
+  --surface-border-color: var(--content-border);
+  --surface-border-width: 1px;
+  --surface-input-bg: transparent;
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);
   --card: oklch(0.205 0 0);
@@ -123,5 +131,22 @@
   }
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+@layer components {
+  .flowly-surface {
+    border-style: solid;
+    border-width: var(--surface-border-width);
+    border-color: var(--surface-border-color);
+    background-color: var(--surface-bg);
+  }
+
+  .flowly-conversation [data-slot='input-group'] {
+    border-style: solid;
+    border-width: var(--surface-border-width) !important;
+    border-color: var(--surface-border-color) !important;
+    background-color: var(--surface-input-bg) !important;
+    box-shadow: none !important;
   }
 }
