@@ -7,7 +7,7 @@
     "api"
   ],
   "scripts": {
-    "dev": "bun run dev:web",
+    "dev": "bun run dev:all",
     "dev:web": "bun run --filter @flowly/web dev",
     "dev:api": "bun run --if-present --filter @flowly/api dev",
     "dev:all": "bun run --workspaces --if-present dev",

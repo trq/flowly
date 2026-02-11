@@ -1,4 +1,4 @@
-import { streamText } from "ai";
+import { convertToModelMessages, streamText, type UIMessage } from "ai";
 import { env } from "../config/env";
 import { getChatModel } from "../llm/model";
 
@@ -29,6 +29,41 @@ export function handleChatGet(request: Request): Response {
   });
 
   return result.toTextStreamResponse({
+    headers: {
+      "access-control-allow-origin": env.CORS_ORIGIN,
+      "cache-control": "no-store",
+      "x-accel-buffering": "no",
+    },
+  });
+}
+
+type ChatRequestBody = {
+  messages?: UIMessage[];
+};
+
+export async function handleChatPost(request: Request): Promise<Response> {
+  let body: ChatRequestBody;
+
+  try {
+    body = (await request.json()) as ChatRequestBody;
+  } catch {
+    return json(400, {
+      error: "Invalid JSON body",
+    });
+  }
+
+  if (!Array.isArray(body.messages) || body.messages.length === 0) {
+    return json(400, {
+      error: "Missing required body field: messages",
+    });
+  }
+
+  const result = streamText({
+    model: getChatModel(),
+    messages: await convertToModelMessages(body.messages),
+  });
+
+  return result.toUIMessageStreamResponse({
     headers: {
       "access-control-allow-origin": env.CORS_ORIGIN,
       "cache-control": "no-store",

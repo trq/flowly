@@ -1,4 +1,4 @@
-import { handleChatGet } from "./chat/controller";
+import { handleChatGet, handleChatPost } from "./chat/controller";
 import { env } from "./config/env";
 
 function notFound(): Response {
@@ -37,7 +37,7 @@ function corsPreflight(): Response {
     status: 204,
     headers: {
       "access-control-allow-origin": env.CORS_ORIGIN,
-      "access-control-allow-methods": "GET, OPTIONS",
+      "access-control-allow-methods": "GET, POST, OPTIONS",
       "access-control-allow-headers": "content-type, authorization",
     },
   });
@@ -45,7 +45,7 @@ function corsPreflight(): Response {
 
 Bun.serve({
   port: env.PORT,
-  fetch(request) {
+  async fetch(request) {
     const url = new URL(request.url);
 
     if (url.pathname === "/chat") {
@@ -53,11 +53,15 @@ Bun.serve({
         return corsPreflight();
       }
 
-      if (request.method !== "GET") {
-        return methodNotAllowed("GET, OPTIONS");
+      if (request.method === "GET") {
+        return handleChatGet(request);
       }
 
-      return handleChatGet(request);
+      if (request.method === "POST") {
+        return handleChatPost(request);
+      }
+
+      return methodNotAllowed("GET, POST, OPTIONS");
     }
 
     return notFound();
