@@ -20,6 +20,7 @@ import {
   PromptInputSubmit,
   PromptInputTextarea,
 } from "@/components/ai-elements/prompt-input";
+import { Card } from "@/components/ui/card";
 
 const rawApiBaseUrl = import.meta.env.VITE_API_URL?.trim().replace(/\/$/, "");
 const chatApiPath = rawApiBaseUrl ? `${rawApiBaseUrl}/chat` : "/chat";
@@ -33,16 +34,16 @@ export default function Conversation() {
   });
 
   return (
-    <section className="h-full min-h-64 px-2 py-4">
-      <div className="flowly-conversation flowly-surface flex h-full min-h-[32rem] flex-col rounded-xl">
+    <section className="h-full min-h-64 px-2 pt-0 pb-4">
+      <Card className="flowly-conversation flowly-surface flex h-full min-h-[32rem] flex-col">
         <AIConversation className="relative min-h-0">
           <ConversationContent>
             {messages.length === 0 ? (
-              <ConversationEmptyState
-                description=""
-                icon={<MessageSquareIcon className="size-8" />}
-                title="Start a conversation"
-              />
+              <ConversationEmptyState>
+                <div className="text-muted-foreground">
+                  <MessageSquareIcon className="size-8" />
+                </div>
+              </ConversationEmptyState>
             ) : (
               messages.map((message) => (
                 <Message from={message.role} key={message.id}>
@@ -96,7 +97,7 @@ export default function Conversation() {
             </PromptInputFooter>
           </PromptInput>
         </div>
-      </div>
+      </Card>
     </section>
   );
 }
