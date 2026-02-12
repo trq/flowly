@@ -1,5 +1,6 @@
-import { handleChatGet, handleChatPost } from "./chat/controller";
-import { env } from "./config/env";
+import { handleChatPost } from "./chat/controller";
+import { env } from "../config/env";
+import { handleEventsGet } from "./events/controller";
 
 function notFound(): Response {
   return new Response(
@@ -53,15 +54,23 @@ Bun.serve({
         return corsPreflight();
       }
 
-      if (request.method === "GET") {
-        return handleChatGet(request);
-      }
-
       if (request.method === "POST") {
         return handleChatPost(request);
       }
 
-      return methodNotAllowed("GET, POST, OPTIONS");
+      return methodNotAllowed("POST, OPTIONS");
+    }
+
+    if (url.pathname === "/events") {
+      if (request.method === "OPTIONS") {
+        return corsPreflight();
+      }
+
+      if (request.method === "GET") {
+        return handleEventsGet();
+      }
+
+      return methodNotAllowed("GET, OPTIONS");
     }
 
     return notFound();
