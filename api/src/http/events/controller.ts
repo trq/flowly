@@ -6,6 +6,23 @@ function encodeSseData(id: number, payload: unknown): Uint8Array {
   return encoder.encode(`id: ${id}\ndata: ${JSON.stringify(payload)}\n\n`);
 }
 
+function buildIncomeVsSavingsMetricSpec() {
+  return {
+    elements: {
+      "income-vs-savings": {
+        children: [],
+        props: {
+          income: 4800,
+          savings: 1200,
+          title: "Income vs savings",
+        },
+        type: "IncomeVsSavingsMetric",
+      },
+    },
+    root: "income-vs-savings",
+  };
+}
+
 export function handleEventsGet(): Response {
   let nextEventId = 1;
   let heartbeatInterval: ReturnType<typeof setInterval> | undefined;
@@ -14,9 +31,14 @@ export function handleEventsGet(): Response {
     start(controller) {
       controller.enqueue(
         encodeSseData(nextEventId++, {
-          message: "hello world",
-          source: "/events",
+          channel: "metrics",
+          id: "evt_metrics_income_vs_savings",
+          payload: {
+            metricId: "income-vs-savings",
+            spec: buildIncomeVsSavingsMetricSpec(),
+          },
           sentAt: new Date().toISOString(),
+          type: "metrics.upsert",
         }),
       );
 

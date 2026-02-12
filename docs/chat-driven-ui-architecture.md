@@ -62,7 +62,7 @@ flowchart LR
 - First event should be a snapshot of current app-visible state
 - Subsequent events are incremental updates
 - Intended for panel updates and notices, not primary token streaming
-- Current implementation placeholder: emits one initial `"hello world"` event on connect
+- Current implementation example: emits one initial `metrics.upsert` event containing a json-render spec
 
 ## Delivery Model (MVP)
 
