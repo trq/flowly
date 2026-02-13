@@ -1,7 +1,7 @@
 import { DefaultChatTransport } from "ai";
 import { useChat } from "@ai-sdk/react";
 import { MessageSquareIcon } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Conversation as AIConversation,
   ConversationContent,
@@ -21,17 +21,39 @@ import {
   PromptInputTextarea,
 } from "@/components/ai-elements/prompt-input";
 import { Card } from "@/components/ui/card";
+import { FLOWLY_EVENT_NAME } from "@/lib/events";
+import { isCommandsSnapshotEvent, type CommandInfo } from "./events";
+import SlashCommandMenu, {
+  type SlashCommandMenuHandle,
+} from "./SlashCommandMenu";
 
 const rawApiBaseUrl = import.meta.env.VITE_API_URL?.trim().replace(/\/$/, "");
 const chatApiPath = rawApiBaseUrl ? `${rawApiBaseUrl}/chat` : "/chat";
 
 export default function Conversation() {
   const [input, setInput] = useState("");
+  const [commands, setCommands] = useState<CommandInfo[]>([]);
+  const menuRef = useRef<SlashCommandMenuHandle>(null);
   const { messages, sendMessage, status, stop } = useChat({
     transport: new DefaultChatTransport({
       api: chatApiPath,
     }),
   });
+
+  useEffect(() => {
+    const onAppEvent = (event: Event) => {
+      const detail = (event as CustomEvent<unknown>).detail;
+      if (isCommandsSnapshotEvent(detail)) {
+        setCommands(detail.payload.commands);
+      }
+    };
+
+    window.addEventListener(FLOWLY_EVENT_NAME, onAppEvent);
+    return () => window.removeEventListener(FLOWLY_EVENT_NAME, onAppEvent);
+  }, []);
+
+  const showMenu = input.startsWith("/");
+  const query = showMenu ? input.slice(1).toLowerCase() : "";
 
   return (
     <section className="h-full min-h-64 px-2 pt-0 pb-4">
@@ -68,7 +90,18 @@ export default function Conversation() {
           <ConversationScrollButton />
         </AIConversation>
 
-        <div className="p-3">
+        <div className="relative p-3">
+          {showMenu && (
+            <SlashCommandMenu
+              ref={menuRef}
+              commands={commands}
+              query={query}
+              onSelect={(name) => {
+                sendMessage({ text: `/${name}` });
+                setInput("");
+              }}
+            />
+          )}
           <PromptInput
             className="w-full"
             onSubmit={({ text }) => {
@@ -83,6 +116,9 @@ export default function Conversation() {
             <PromptInputBody>
               <PromptInputTextarea
                 onChange={(event) => setInput(event.currentTarget.value)}
+                onKeyDown={(e) => {
+                  if (showMenu && menuRef.current?.handleKeyDown(e)) return;
+                }}
                 placeholder="Ask me about your budget..."
                 value={input}
               />
