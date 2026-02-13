@@ -14,6 +14,7 @@
     "build": "bun run --workspaces --if-present build",
     "build:web": "bun run --filter @flowly/web build",
     "build:api": "bun run --if-present --filter @flowly/api build",
-    "preview:web": "bun run --filter @flowly/web preview"
+    "preview:web": "bun run --filter @flowly/web preview",
+    "test": "bun run --workspaces --if-present test"
   }
 }

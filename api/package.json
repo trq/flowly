@@ -8,7 +8,8 @@
     "dev": "bun --watch src/http/server.ts",
     "start": "bun src/http/server.ts",
     "build": "bun build src/http/server.ts --target bun --outdir dist",
-    "typecheck": "bunx tsc --noEmit"
+    "typecheck": "bunx tsc --noEmit",
+    "test": "bun test"
   },
   "dependencies": {
     "@openrouter/ai-sdk-provider": "^2.2.3",
