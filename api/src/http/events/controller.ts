@@ -1,3 +1,4 @@
+import { list as listCommands } from "../../commands";
 import { env } from "../../config/env";
 import { subscribe, unsubscribe, type AppEvent } from "../../events/bus";
 
@@ -41,6 +42,16 @@ export function handleEventsGet(): Response {
           },
           sentAt: new Date().toISOString(),
           type: "metrics.upsert",
+        }),
+      );
+
+      controller.enqueue(
+        encodeSseData(nextEventId++, {
+          channel: "commands",
+          id: "evt_commands_snapshot",
+          payload: { commands: listCommands() },
+          sentAt: new Date().toISOString(),
+          type: "commands.snapshot",
         }),
       );
 

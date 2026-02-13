@@ -2,15 +2,11 @@ import {
   createUIMessageStream,
   createUIMessageStreamResponse,
 } from "ai";
-import { publish } from "../../events/bus";
+import { resolve } from "../../commands";
 
 type SlashCommand = {
   command: string;
   args: string;
-};
-
-type CommandResult = {
-  text: string;
 };
 
 export function parseSlashCommand(text: string): SlashCommand | null {
@@ -32,25 +28,10 @@ export function handleSlashCommand(
   parsed: SlashCommand,
   headers: Record<string, string>,
 ): Response | null {
-  let result: CommandResult | null = null;
+  const definition = resolve(parsed.command);
+  if (!definition) return null;
 
-  switch (parsed.command) {
-    case "logout": {
-      publish({
-        id: `evt_session_logout_${Date.now()}`,
-        channel: "session",
-        type: "session.logout",
-        payload: {},
-        sentAt: new Date().toISOString(),
-      });
-      result = { text: "Signing out…" };
-      break;
-    }
-  }
-
-  if (!result) return null;
-
-  const { text } = result;
+  const text = definition.handler(parsed.args);
 
   return createUIMessageStreamResponse({
     headers,

@@ -1,3 +1,4 @@
+import "../commands";
 import { handleChatPost } from "./chat/controller";
 import { env } from "../config/env";
 import { handleEventsGet } from "./events/controller";
