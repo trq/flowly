@@ -1,4 +1,5 @@
 import { env } from "../../config/env";
+import { subscribe, unsubscribe, type AppEvent } from "../../events/bus";
 
 const encoder = new TextEncoder();
 
@@ -26,6 +27,7 @@ function buildIncomeVsSavingsMetricSpec() {
 export function handleEventsGet(): Response {
   let nextEventId = 1;
   let heartbeatInterval: ReturnType<typeof setInterval> | undefined;
+  let onBusEvent: ((event: AppEvent) => void) | undefined;
 
   const stream = new ReadableStream<Uint8Array>({
     start(controller) {
@@ -42,11 +44,17 @@ export function handleEventsGet(): Response {
         }),
       );
 
+      onBusEvent = (event: AppEvent) => {
+        controller.enqueue(encodeSseData(nextEventId++, event));
+      };
+      subscribe(onBusEvent);
+
       heartbeatInterval = setInterval(() => {
         controller.enqueue(encoder.encode(`: heartbeat\n\n`));
       }, 30_000);
     },
     cancel() {
+      if (onBusEvent) unsubscribe(onBusEvent);
       if (heartbeatInterval) {
         clearInterval(heartbeatInterval);
       }

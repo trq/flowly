@@ -1,6 +1,7 @@
 import { convertToModelMessages, streamText, type UIMessage } from "ai";
 import { env } from "../../config/env";
 import { getChatModel } from "../../llm/model";
+import { handleSlashCommand, parseSlashCommand } from "./commands";
 
 function json(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
@@ -34,16 +35,28 @@ export async function handleChatPost(request: Request): Promise<Response> {
     });
   }
 
+  const lastMessage = body.messages[body.messages.length - 1];
+  const lastMessageText =
+    lastMessage?.role === "user"
+      ? lastMessage.parts?.find((p) => p.type === "text")?.text ?? ""
+      : "";
+
+  const streamHeaders = {
+    "access-control-allow-origin": env.CORS_ORIGIN,
+    "cache-control": "no-store",
+    "x-accel-buffering": "no",
+  };
+
+  const parsed = parseSlashCommand(lastMessageText);
+  if (parsed) {
+    const commandResponse = handleSlashCommand(parsed, streamHeaders);
+    if (commandResponse) return commandResponse;
+  }
+
   const result = streamText({
     model: getChatModel(),
     messages: await convertToModelMessages(body.messages),
   });
 
-  return result.toUIMessageStreamResponse({
-    headers: {
-      "access-control-allow-origin": env.CORS_ORIGIN,
-      "cache-control": "no-store",
-      "x-accel-buffering": "no",
-    },
-  });
+  return result.toUIMessageStreamResponse({ headers: streamHeaders });
 }
