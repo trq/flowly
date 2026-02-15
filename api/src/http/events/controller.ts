@@ -1,4 +1,4 @@
-import { list as listCommands } from "../../commands";
+import { list as listCommands } from "../../slash";
 import { env } from "../../config/env";
 import {
   subscribe,
@@ -52,7 +52,7 @@ export function handleEventsGet(request: Request): Response {
       controller.enqueue(
         encodeSseSnapshot({
           channel: "metrics",
-          id: "evt_metrics_income_vs_savings",
+          id: crypto.randomUUID(),
           payload: {
             metricId: "income-vs-savings",
             spec: buildIncomeVsSavingsMetricSpec(),
@@ -65,7 +65,7 @@ export function handleEventsGet(request: Request): Response {
       controller.enqueue(
         encodeSseSnapshot({
           channel: "commands",
-          id: "evt_commands_snapshot",
+          id: crypto.randomUUID(),
           payload: { commands: listCommands() },
           sentAt: new Date().toISOString(),
           type: "commands.snapshot",

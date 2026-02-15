@@ -9,9 +9,9 @@ import {
 } from "../../src/events/store";
 import type { AppEvent } from "../../src/events/bus";
 
-function makeEvent(id: string): AppEvent {
+function makeEvent(id?: string): AppEvent {
   return {
-    id,
+    id: id ?? crypto.randomUUID(),
     channel: "test",
     type: "test.event",
     payload: {},

@@ -8,7 +8,7 @@ import {
 } from "../../../src/http/chat/commands";
 
 // Ensure the logout command is registered
-import "../../../src/commands/logout";
+import "../../../src/slash/commands/logout";
 
 let mongod: MongoMemoryServer;
 

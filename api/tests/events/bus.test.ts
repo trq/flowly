@@ -18,7 +18,7 @@ import {
 
 function makeEvent(overrides: Partial<AppEvent> = {}): AppEvent {
   return {
-    id: `evt_test_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+    id: crypto.randomUUID(),
     channel: "test",
     type: "test.event",
     payload: {},

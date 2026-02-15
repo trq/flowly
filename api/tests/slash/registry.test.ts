@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeEach } from "bun:test";
-import { register, resolve, list } from "../../src/commands/registry";
+import { register, resolve, list } from "../../src/slash/registry";
 
 // The registry uses a module-level Map, so we register fresh commands per test
 // using unique names to avoid cross-test pollution.

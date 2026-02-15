@@ -1,4 +1,4 @@
-import "../commands";
+import "../slash";
 import { handleChatPost } from "./chat/controller";
 import { env } from "../config/env";
 import { connectDb } from "../db/client";

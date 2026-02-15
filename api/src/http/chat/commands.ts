@@ -2,7 +2,7 @@ import {
   createUIMessageStream,
   createUIMessageStreamResponse,
 } from "ai";
-import { resolve } from "../../commands";
+import { resolve } from "../../slash";
 
 type SlashCommand = {
   command: string;

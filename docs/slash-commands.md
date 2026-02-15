@@ -18,7 +18,7 @@ sequenceDiagram
   Web->>Web: User types "/" → autocomplete menu appears
   Web->>Chat: User selects /logout
   Chat->>Registry: resolve("logout")
-  Registry-->>Chat: CommandDefinition
+  Registry-->>Chat: SlashCommand
   Chat->>Chat: Call handler, get response text
   Chat-->>Web: UIMessageStream ("Signing out…")
   Chat->>Bus: publish(session.logout event)
@@ -32,17 +32,27 @@ sequenceDiagram
 - **Backend is the source of truth.** Commands are registered in the API, and the frontend discovers them via a `commands.snapshot` SSE event on connection. No command list is hardcoded on the frontend.
 - **Commands are intercepted before the LLM.** When `POST /chat` receives a message starting with `/`, it checks the registry before routing to the language model. If a command matches, the LLM is skipped entirely.
 - **Responses use the ai-sdk streaming protocol.** Command responses are returned via `createUIMessageStreamResponse`, so they render as normal assistant messages in the chat.
-- **Side effects flow through the event bus.** Commands that need to trigger client-side behavior (like logout) publish events to the in-memory bus, which fans out to all SSE connections.
+- **Side effects flow through the event bus.** Commands that need to trigger client-side behavior (like logout) publish events to the bus, which fans out to all SSE connections.
+
+### Why an interface, not an abstract class
+
+Each command implements the `SlashCommand` type — a plain TypeScript interface with `name`, `description`, and `handler`. This was a deliberate choice:
+
+- **Commands are currently independent.** Each handler is a self-contained function with no shared behavior to inherit. An abstract class would add ceremony without providing value.
+- **The type system enforces the contract.** TypeScript checks the shape at compile time — a handler that forgets `name` or returns the wrong type won't compile.
+- **Registration is explicit.** Commands call `register()` at module load time rather than relying on class instantiation or decorators.
+
+If commands later need shared behavior (argument parsing, permission checks, error wrapping), promoting `SlashCommand` to an abstract class with base methods would be the natural evolution. Until then, the interface keeps things minimal.
 
 ## Adding a new command
 
 ### 1. Create a command file
 
-Create a new file in `api/src/commands/`:
+Create a new file in `api/src/slash/commands/`:
 
 ```typescript
-// api/src/commands/help.ts
-import { register } from "./registry";
+// api/src/slash/commands/help.ts
+import { register } from "../registry";
 
 register({
   name: "help",
@@ -54,14 +64,14 @@ register({
 });
 ```
 
-The `handler` function receives the argument string (text after the command name) and returns the response text that will be shown as an assistant message.
+The `handler` function receives the argument string (text after the command name) and returns the response text that will be shown as an assistant message. Handlers may be `async` if they need to perform side effects like publishing events.
 
 ### 2. Import it in the barrel file
 
 ```typescript
-// api/src/commands/index.ts
-import "./logout";
-import "./help";    // ← add this
+// api/src/slash/index.ts
+import "./commands/logout";
+import "./commands/help";    // ← add this
 
 export { list, resolve } from "./registry";
 ```
@@ -76,15 +86,15 @@ The import triggers `register()` at startup. The command will automatically:
 If the command needs to trigger client-side behavior beyond the chat response, publish an event:
 
 ```typescript
-import { publish } from "../events/bus";
-import { register } from "./registry";
+import { publish } from "../../events/bus";
+import { register } from "../registry";
 
 register({
   name: "clear",
   description: "Clear the dashboard",
-  handler() {
-    publish({
-      id: `evt_dashboard_clear_${Date.now()}`,
+  async handler() {
+    await publish({
+      id: crypto.randomUUID(),
       channel: "dashboard",
       type: "dashboard.clear",
       payload: {},
@@ -99,26 +109,24 @@ Then add a corresponding event type guard on the frontend (`web/src/components/l
 
 ## Command registry API
 
-Located in `api/src/commands/registry.ts`:
+Located in `api/src/slash/registry.ts`:
 
 | Function | Signature | Description |
 |----------|-----------|-------------|
-| `register` | `(def: CommandDefinition) => void` | Register a command |
-| `resolve` | `(name: string) => CommandDefinition \| undefined` | Look up a command by name |
-| `list` | `() => CommandInfo[]` | List all commands (name + description, no handlers) |
+| `register` | `(command: SlashCommand) => void` | Register a command |
+| `resolve` | `(name: string) => SlashCommand \| undefined` | Look up a command by name |
+| `list` | `() => SlashCommandInfo[]` | List all commands (name + description, no handlers) |
 
 ### Types
 
 ```typescript
-type CommandHandler = (args: string) => string;
-
-type CommandDefinition = {
+type SlashCommand = {
   name: string;
   description: string;
-  handler: CommandHandler;
+  handler: (args: string) => string | Promise<string>;
 };
 
-type CommandInfo = {
+type SlashCommandInfo = {
   name: string;
   description: string;
 };
@@ -138,10 +146,13 @@ Tests live in `{package}/tests/` mirroring the `src/` structure:
 
 ```
 api/tests/
-├── commands/
+├── slash/
 │   └── registry.test.ts    # Registry register/resolve/list
 ├── events/
-│   └── bus.test.ts          # Pub/sub event bus
+│   ├── bus.test.ts          # Pub/sub event bus
+│   └── store.test.ts        # Event store persistence
+├── db/
+│   └── client.test.ts       # MongoDB connection
 └── http/chat/
     └── commands.test.ts     # Slash command parsing + handling
 
