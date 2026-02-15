@@ -2,7 +2,7 @@ import { convertToModelMessages, streamText, type UIMessage } from "ai";
 import { env } from "../../config/env";
 import { getChatModel } from "../../llm/model";
 import { handleSlashCommand, parseSlashCommand } from "./commands";
-
+import { resolveRequestIdentity } from "../../auth/identity";
 function json(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
     status,
@@ -17,14 +17,6 @@ function json(status: number, body: unknown): Response {
 type ChatRequestBody = {
   messages?: UIMessage[];
 };
-
-function readUserId(request: Request): string | null {
-  const value = request.headers.get("x-flowly-user-id");
-  if (!value) return null;
-
-  const trimmed = value.trim();
-  return trimmed ? trimmed : null;
-}
 
 export async function handleChatPost(request: Request): Promise<Response> {
   let body: ChatRequestBody;
@@ -57,8 +49,9 @@ export async function handleChatPost(request: Request): Promise<Response> {
 
   const parsed = parseSlashCommand(lastMessageText);
   if (parsed) {
+    const identity = await resolveRequestIdentity(request);
     const commandResponse = await handleSlashCommand(parsed, streamHeaders, {
-      userId: readUserId(request),
+      userId: identity.userId,
     });
     if (commandResponse) return commandResponse;
   }

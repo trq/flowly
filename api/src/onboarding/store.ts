@@ -2,7 +2,7 @@ import { getDb } from "../db/client";
 import type { PayCycleCadence } from "../budgets/store";
 
 export type OnboardingStep =
-  | "budgetBasics"
+  | "budget"
   | "pools"
   | "categories"
   | "done";

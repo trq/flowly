@@ -41,7 +41,7 @@ describe("budget onboarding service", () => {
 
     expect(first.sessionId).toBeString();
     expect(second.sessionId).toBe(first.sessionId);
-    expect(first.currentStep).toBe("budgetBasics");
+    expect(first.currentStep).toBe("budget");
     expect(first.status).toBe("active");
   });
 
@@ -113,4 +113,3 @@ describe("budget onboarding service", () => {
     expect(cancelled.status).toBe("cancelled");
   });
 });
-

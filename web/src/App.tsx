@@ -14,10 +14,10 @@ export default function App() {
   const handleLogout = useCallback(() => clearIdentity(), [clearIdentity])
 
   useEffect(() => {
-    if (!identity.userId) return
+    if (!identity.userId || !identity.token) return
 
     const eventSource = new EventSource(
-      `${eventsApiBasePath}?userId=${encodeURIComponent(identity.userId)}`
+      `${eventsApiBasePath}?access_token=${encodeURIComponent(identity.token)}`
     )
 
     eventSource.onmessage = (event) => {
@@ -41,7 +41,7 @@ export default function App() {
     return () => {
       eventSource.close()
     }
-  }, [identity.userId])
+  }, [identity.userId, identity.token])
 
   useEffect(() => {
     if (!identity.userId) return

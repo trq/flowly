@@ -40,8 +40,8 @@ export default function Conversation() {
     transport: new DefaultChatTransport({
       api: chatApiPath,
       headers: (): Record<string, string> => {
-        if (!identity.userId) return {} as Record<string, string>;
-        return { "x-flowly-user-id": identity.userId };
+        if (!identity.token) return {};
+        return { Authorization: `Bearer ${identity.token}` };
       },
     }),
   });

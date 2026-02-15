@@ -3,6 +3,7 @@ import { MongoMemoryServer } from "mongodb-memory-server";
 import { connectDb, disconnectDb } from "../../../src/db/client";
 import {
   getSubscriberCountForTests,
+  getCurrentSeq,
   publish,
   type AppEvent,
 } from "../../../src/events/bus";
@@ -160,7 +161,9 @@ describe("events SSE controller", () => {
     const started = await startBudgetOnboarding({ userId });
 
     const response = handleEventsGet(
-      new Request(`http://localhost/events?userId=${userId}`),
+      new Request("http://localhost/events", {
+        headers: { "x-flowly-user-id": userId },
+      }),
     );
     const frames = await collectSseFrames(response, 4);
     const parsed = frames.map(parseSseFrame);
@@ -183,5 +186,50 @@ describe("events SSE controller", () => {
         }),
       }),
     );
+  });
+
+  test("replay filters user-scoped events to the authenticated user", async () => {
+    const userA = "ps_events_user_a";
+    const userB = "ps_events_user_b";
+    const boundary = await getCurrentSeq();
+
+    const eventA: AppEvent = {
+      id: crypto.randomUUID(),
+      channel: "budgets",
+      type: "budgets.created",
+      payload: { budgetId: crypto.randomUUID(), userId: userA },
+      sentAt: new Date().toISOString(),
+    };
+    const eventB: AppEvent = {
+      id: crypto.randomUUID(),
+      channel: "budgets",
+      type: "budgets.created",
+      payload: { budgetId: crypto.randomUUID(), userId: userB },
+      sentAt: new Date().toISOString(),
+    };
+
+    await publish(eventA);
+    await publish(eventB);
+
+    const response = handleEventsGet(
+      new Request("http://localhost/events", {
+        headers: {
+          "Last-Event-ID": String(boundary),
+          "x-flowly-user-id": userA,
+        },
+      }),
+    );
+    const frames = await collectSseFrames(response, 3);
+    const parsed = frames.map(parseSseFrame);
+
+    const seenA = parsed.find(
+      ({ data }) => isRecord(data) && data.id === eventA.id,
+    );
+    const seenB = parsed.find(
+      ({ data }) => isRecord(data) && data.id === eventB.id,
+    );
+
+    expect(seenA).toBeDefined();
+    expect(seenB).toBeUndefined();
   });
 });

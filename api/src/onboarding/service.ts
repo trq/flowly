@@ -84,7 +84,7 @@ export async function startBudgetOnboarding(
     _id: crypto.randomUUID(),
     userId: input.userId,
     status: "active",
-    currentStep: "budgetBasics",
+    currentStep: "budget",
     draft: {},
     createdAt,
     updatedAt: createdAt,

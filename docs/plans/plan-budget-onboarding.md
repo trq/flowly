@@ -104,7 +104,7 @@ type PayCycleDoc = {
 
 ```ts
 type OnboardingStep =
-  | "budgetBasics" // name + cadence + day + timezone
+  | "budget" // name + cadence + day + timezone
   | "pools" // future
   | "categories" // future
   | "done";
@@ -132,7 +132,7 @@ type BudgetOnboardingSessionDoc = {
 
 MVP transition set:
 
-1. `start` -> create/reuse active session -> `budgetBasics`
+1. `start` -> create/reuse active session -> `budget`
 2. `submitBudgetBasics` (valid input) ->
    - create budget
    - create pay cycle

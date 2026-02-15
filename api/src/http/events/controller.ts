@@ -1,6 +1,7 @@
 import { list as listCommands } from "../../slash";
 import { env } from "../../config/env";
 import { findActiveSessionByUserId } from "../../onboarding/store";
+import { resolveRequestIdentity } from "../../auth/identity";
 import {
   getCurrentSeq,
   subscribe,
@@ -10,6 +11,26 @@ import {
 } from "../../events/bus";
 
 const encoder = new TextEncoder();
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function getEventUserId(event: AppEvent): string | null {
+  if (!isRecord(event.payload)) return null;
+  const value = event.payload.userId;
+  if (typeof value !== "string") return null;
+
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function isEventVisibleToUser(event: AppEvent, userId: string | null): boolean {
+  const eventUserId = getEventUserId(event);
+  if (!eventUserId) return true;
+  if (!userId) return false;
+  return eventUserId === userId;
+}
 
 function encodeSseSnapshot(payload: unknown): Uint8Array {
   return encoder.encode(`data: ${JSON.stringify(payload)}\n\n`);
@@ -39,9 +60,6 @@ function buildIncomeVsSavingsMetricSpec() {
 }
 
 export function handleEventsGet(request: Request): Response {
-  const requestUrl = new URL(request.url);
-  const userIdParam = requestUrl.searchParams.get("userId");
-  const userId = userIdParam?.trim() ? userIdParam.trim() : null;
   const lastEventId = request.headers.get("Last-Event-ID");
   const lastSeq =
     lastEventId && /^\d+$/.test(lastEventId)
@@ -57,6 +75,11 @@ export function handleEventsGet(request: Request): Response {
       let streaming = false;
 
       try {
+        const identity = await resolveRequestIdentity(request, {
+          allowQueryToken: true,
+        });
+        const userId = identity.userId;
+
         const replayFromSeq = lastSeq ?? (await getCurrentSeq());
 
         // On first connect, emit a cursor event with the current seq so reconnect
@@ -120,6 +143,10 @@ export function handleEventsGet(request: Request): Response {
 
         // 2. Subscribe to live bus first, buffer events
         onBusEvent = (event: AppEvent) => {
+          if (!isEventVisibleToUser(event, userId)) {
+            return;
+          }
+
           if (streaming) {
             controller.enqueue(encodeSseEvent(event.seq!, event));
           } else {
@@ -133,6 +160,9 @@ export function handleEventsGet(request: Request): Response {
         const replayedSeqs = new Set<number>();
 
         for (const event of missed) {
+          if (!isEventVisibleToUser(event, userId)) {
+            continue;
+          }
           controller.enqueue(encodeSseEvent(event.seq!, event));
           replayedSeqs.add(event.seq!);
         }
