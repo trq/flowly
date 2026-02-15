@@ -2,6 +2,7 @@ import { DefaultChatTransport } from "ai";
 import { useChat } from "@ai-sdk/react";
 import { MessageSquareIcon } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { useShooAuth } from "@shoojs/react";
 import {
   Conversation as AIConversation,
   ConversationContent,
@@ -34,9 +35,14 @@ export default function Conversation() {
   const [input, setInput] = useState("");
   const [commands, setCommands] = useState<CommandInfo[]>([]);
   const menuRef = useRef<SlashCommandMenuHandle>(null);
+  const { identity } = useShooAuth();
   const { messages, sendMessage, status, stop } = useChat({
     transport: new DefaultChatTransport({
       api: chatApiPath,
+      headers: (): Record<string, string> => {
+        if (!identity.userId) return {} as Record<string, string>;
+        return { "x-flowly-user-id": identity.userId };
+      },
     }),
   });
 

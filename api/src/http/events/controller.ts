@@ -1,5 +1,6 @@
 import { list as listCommands } from "../../slash";
 import { env } from "../../config/env";
+import { findActiveSessionByUserId } from "../../onboarding/store";
 import {
   getCurrentSeq,
   subscribe,
@@ -38,6 +39,9 @@ function buildIncomeVsSavingsMetricSpec() {
 }
 
 export function handleEventsGet(request: Request): Response {
+  const requestUrl = new URL(request.url);
+  const userIdParam = requestUrl.searchParams.get("userId");
+  const userId = userIdParam?.trim() ? userIdParam.trim() : null;
   const lastEventId = request.headers.get("Last-Event-ID");
   const lastSeq =
     lastEventId && /^\d+$/.test(lastEventId)
@@ -92,6 +96,27 @@ export function handleEventsGet(request: Request): Response {
             type: "commands.snapshot",
           }),
         );
+
+        if (userId) {
+          const activeSession = await findActiveSessionByUserId(userId);
+          if (activeSession) {
+            controller.enqueue(
+              encodeSseSnapshot({
+                channel: "onboarding",
+                id: crypto.randomUUID(),
+                payload: {
+                  currentStep: activeSession.currentStep,
+                  draft: activeSession.draft,
+                  sessionId: activeSession._id,
+                  status: activeSession.status,
+                  userId: activeSession.userId,
+                },
+                sentAt: new Date().toISOString(),
+                type: "onboarding.snapshot",
+              }),
+            );
+          }
+        }
 
         // 2. Subscribe to live bus first, buffer events
         onBusEvent = (event: AppEvent) => {

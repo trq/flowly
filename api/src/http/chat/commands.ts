@@ -3,6 +3,7 @@ import {
   createUIMessageStreamResponse,
 } from "ai";
 import { resolve } from "../../slash";
+import type { SlashCommandContext } from "../../slash/registry";
 
 type SlashCommand = {
   command: string;
@@ -27,11 +28,12 @@ export function parseSlashCommand(text: string): SlashCommand | null {
 export async function handleSlashCommand(
   parsed: SlashCommand,
   headers: Record<string, string>,
+  context: SlashCommandContext = {},
 ): Promise<Response | null> {
   const definition = resolve(parsed.command);
   if (!definition) return null;
 
-  const text = await definition.handler(parsed.args);
+  const text = await definition.handler(parsed.args, context);
 
   return createUIMessageStreamResponse({
     headers,

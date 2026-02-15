@@ -2,6 +2,7 @@ import { describe, test, expect, beforeAll, afterAll } from "bun:test";
 import { MongoMemoryServer } from "mongodb-memory-server";
 import { connectDb, disconnectDb } from "../../../src/db/client";
 import { ensureIndexes } from "../../../src/events/store";
+import { getEventsSince } from "../../../src/events/bus";
 import {
   parseSlashCommand,
   handleSlashCommand,
@@ -71,8 +72,32 @@ describe("handleSlashCommand", () => {
 
   test("returns null for an unknown command", async () => {
     const parsed = { command: "unknown", args: "" };
-    const response = await handleSlashCommand(parsed, headers);
+    const response = await handleSlashCommand(parsed, headers, {
+      userId: "ps_test_user_unknown",
+    });
 
     expect(response).toBeNull();
+  });
+
+  test("/new budget starts onboarding and publishes onboarding.started event", async () => {
+    const parsed = parseSlashCommand("/new budget");
+    expect(parsed).toEqual({ command: "new", args: "budget" });
+
+    const response = await handleSlashCommand(parsed!, headers, {
+      userId: "ps_test_user_new_budget",
+    });
+
+    expect(response).toBeInstanceOf(Response);
+
+    const events = await getEventsSince(0);
+    const started = events.find((event) => event.type === "onboarding.started");
+
+    expect(started).toBeDefined();
+    expect(started!.channel).toBe("onboarding");
+    expect(started!.payload).toEqual(
+      expect.objectContaining({
+        userId: "ps_test_user_new_budget",
+      }),
+    );
   });
 });

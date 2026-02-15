@@ -8,6 +8,7 @@ import {
 } from "../../../src/events/bus";
 import { ensureIndexes } from "../../../src/events/store";
 import { handleEventsGet } from "../../../src/http/events/controller";
+import { startBudgetOnboarding } from "../../../src/onboarding/service";
 
 const decoder = new TextDecoder();
 
@@ -152,5 +153,35 @@ describe("events SSE controller", () => {
       await connectDb(mongod.getUri());
       await ensureIndexes();
     }
+  });
+
+  test("startup includes onboarding snapshot for user with active onboarding session", async () => {
+    const userId = "ps_events_onboarding_user";
+    const started = await startBudgetOnboarding({ userId });
+
+    const response = handleEventsGet(
+      new Request(`http://localhost/events?userId=${userId}`),
+    );
+    const frames = await collectSseFrames(response, 4);
+    const parsed = frames.map(parseSseFrame);
+
+    const snapshot = parsed.find(({ data }) => {
+      if (!isRecord(data)) return false;
+      return data.channel === "onboarding" && data.type === "onboarding.snapshot";
+    });
+
+    expect(snapshot).toBeDefined();
+    expect(snapshot!.id).toBeNull();
+    expect(snapshot!.data).toEqual(
+      expect.objectContaining({
+        channel: "onboarding",
+        type: "onboarding.snapshot",
+        payload: expect.objectContaining({
+          sessionId: started.sessionId,
+          userId,
+          status: "active",
+        }),
+      }),
+    );
   });
 });

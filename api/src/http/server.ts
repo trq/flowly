@@ -2,7 +2,9 @@ import "../slash";
 import { handleChatPost } from "./chat/controller";
 import { env } from "../config/env";
 import { connectDb } from "../db/client";
-import { ensureIndexes } from "../events/store";
+import { ensureIndexes as ensureEventIndexes } from "../events/store";
+import { ensureIndexes as ensureBudgetIndexes } from "../budgets/store";
+import { ensureIndexes as ensureOnboardingIndexes } from "../onboarding/store";
 import { handleEventsGet } from "./events/controller";
 
 function notFound(): Response {
@@ -49,7 +51,9 @@ function corsPreflight(): Response {
 
 async function main() {
   await connectDb(env.MONGO_URI);
-  await ensureIndexes();
+  await ensureEventIndexes();
+  await ensureBudgetIndexes();
+  await ensureOnboardingIndexes();
 
   Bun.serve({
     port: env.PORT,

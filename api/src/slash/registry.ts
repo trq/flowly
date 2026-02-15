@@ -1,7 +1,14 @@
+export type SlashCommandContext = {
+  userId?: string | null;
+};
+
 export type SlashCommand = {
   name: string;
   description: string;
-  handler: (args: string) => string | Promise<string>;
+  handler: (
+    args: string,
+    context?: SlashCommandContext,
+  ) => string | Promise<string>;
 };
 
 export type SlashCommandInfo = {

@@ -18,6 +18,14 @@ type ChatRequestBody = {
   messages?: UIMessage[];
 };
 
+function readUserId(request: Request): string | null {
+  const value = request.headers.get("x-flowly-user-id");
+  if (!value) return null;
+
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
+}
+
 export async function handleChatPost(request: Request): Promise<Response> {
   let body: ChatRequestBody;
 
@@ -49,7 +57,9 @@ export async function handleChatPost(request: Request): Promise<Response> {
 
   const parsed = parseSlashCommand(lastMessageText);
   if (parsed) {
-    const commandResponse = await handleSlashCommand(parsed, streamHeaders);
+    const commandResponse = await handleSlashCommand(parsed, streamHeaders, {
+      userId: readUserId(request),
+    });
     if (commandResponse) return commandResponse;
   }
 
