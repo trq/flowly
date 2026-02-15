@@ -4,8 +4,8 @@ import { register } from "./registry";
 register({
   name: "logout",
   description: "Sign out of Flowly",
-  handler() {
-    publish({
+  async handler() {
+    await publish({
       id: `evt_session_logout_${Date.now()}`,
       channel: "session",
       type: "session.logout",

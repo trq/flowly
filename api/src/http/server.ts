@@ -1,6 +1,8 @@
 import "../commands";
 import { handleChatPost } from "./chat/controller";
 import { env } from "../config/env";
+import { connectDb } from "../db/client";
+import { ensureIndexes } from "../events/store";
 import { handleEventsGet } from "./events/controller";
 
 function notFound(): Response {
@@ -45,39 +47,50 @@ function corsPreflight(): Response {
   });
 }
 
-Bun.serve({
-  port: env.PORT,
-  async fetch(request) {
-    const url = new URL(request.url);
+async function main() {
+  await connectDb(env.MONGO_URI);
+  await ensureIndexes();
 
-    if (url.pathname === "/chat") {
-      if (request.method === "OPTIONS") {
-        return corsPreflight();
+  Bun.serve({
+    port: env.PORT,
+    idleTimeout: 0,
+    async fetch(request) {
+      const url = new URL(request.url);
+
+      if (url.pathname === "/chat") {
+        if (request.method === "OPTIONS") {
+          return corsPreflight();
+        }
+
+        if (request.method === "POST") {
+          return handleChatPost(request);
+        }
+
+        return methodNotAllowed("POST, OPTIONS");
       }
 
-      if (request.method === "POST") {
-        return handleChatPost(request);
+      if (url.pathname === "/events") {
+        if (request.method === "OPTIONS") {
+          return corsPreflight();
+        }
+
+        if (request.method === "GET") {
+          return handleEventsGet(request);
+        }
+
+        return methodNotAllowed("GET, OPTIONS");
       }
 
-      return methodNotAllowed("POST, OPTIONS");
-    }
+      return notFound();
+    },
+  });
 
-    if (url.pathname === "/events") {
-      if (request.method === "OPTIONS") {
-        return corsPreflight();
-      }
+  console.log(
+    `Flowly API listening on http://localhost:${env.PORT} (provider=${env.LLM_PROVIDER}, model=${env.LLM_MODEL})`,
+  );
+}
 
-      if (request.method === "GET") {
-        return handleEventsGet();
-      }
-
-      return methodNotAllowed("GET, OPTIONS");
-    }
-
-    return notFound();
-  },
+main().catch((err) => {
+  console.error("Failed to start:", err);
+  process.exit(1);
 });
-
-console.log(
-  `Flowly API listening on http://localhost:${env.PORT} (provider=${env.LLM_PROVIDER}, model=${env.LLM_MODEL})`,
-);

@@ -1,4 +1,4 @@
-export type CommandHandler = (args: string) => string;
+export type CommandHandler = (args: string) => string | Promise<string>;
 
 export type CommandDefinition = {
   name: string;

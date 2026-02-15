@@ -7,7 +7,7 @@
     "api"
   ],
   "scripts": {
-    "dev": "bunx agent-tail run 'web: bun run --filter @flowly/web dev' 'api: bun run --if-present --filter @flowly/api dev'",
+    "dev": "bunx agent-tail-core run 'web: bun run --filter @flowly/web dev' 'api: bun run --if-present --filter @flowly/api dev'",
     "dev:web": "bun run --filter @flowly/web dev",
     "dev:api": "bun run --if-present --filter @flowly/api dev",
     "dev:all": "bun run --workspaces --if-present dev",
@@ -18,6 +18,8 @@
     "test": "bun run --workspaces --if-present test"
   },
   "devDependencies": {
-    "agent-tail": "^0.3.5"
+    "agent-tail": "^0.3.5",
+    "agent-tail-core": "^0.3.5",
+    "vite-plugin-agent-tail": "^0.3.5"
   }
 }
