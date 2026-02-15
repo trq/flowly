@@ -11,6 +11,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@flowly/contracts": "workspace:*",
     "@ai-sdk/react": "^3.0.81",
     "@json-render/react": "^0.5.2",
     "@shoojs/react": "^0.2.0",

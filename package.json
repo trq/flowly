@@ -4,7 +4,8 @@
   "packageManager": "bun@1.3.5",
   "workspaces": [
     "web",
-    "api"
+    "api",
+    "packages/*"
   ],
   "scripts": {
     "dev": "bunx agent-tail-core run 'web: bun run --filter @flowly/web dev' 'api: bun run --if-present --filter @flowly/api dev'",

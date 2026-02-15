@@ -14,8 +14,10 @@
       "name": "@flowly/api",
       "version": "0.0.0",
       "dependencies": {
+        "@flowly/contracts": "workspace:*",
         "@openrouter/ai-sdk-provider": "^2.2.3",
         "ai": "^6.0.79",
+        "jose": "^6.1.3",
         "mongodb": "^6",
       },
       "devDependencies": {
@@ -24,11 +26,16 @@
         "typescript": "~5.8.3",
       },
     },
+    "packages/contracts": {
+      "name": "@flowly/contracts",
+      "version": "0.0.0",
+    },
     "web": {
       "name": "@flowly/web",
       "version": "0.0.0",
       "dependencies": {
         "@ai-sdk/react": "^3.0.81",
+        "@flowly/contracts": "workspace:*",
         "@json-render/react": "^0.5.2",
         "@shoojs/react": "^0.2.0",
         "@streamdown/cjk": "^1.0.2",
@@ -244,6 +251,8 @@
     "@floating-ui/utils": ["@floating-ui/utils@0.2.10", "", {}, "sha512-aGTxbpbg8/b5JfU1HXSrbH3wXZuLPJcNEcZQFMxLs3oSzgtVu6nFPkbbGGUvBcUjKV2YyB9Wxxabo+HEH9tcRQ=="],
 
     "@flowly/api": ["@flowly/api@workspace:api"],
+
+    "@flowly/contracts": ["@flowly/contracts@workspace:packages/contracts"],
 
     "@flowly/web": ["@flowly/web@workspace:web"],
 

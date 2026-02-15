@@ -10,6 +10,7 @@ type Env = {
   OPENROUTER_BASE_URL?: string;
   CORS_ORIGIN: string;
   MONGO_URI: string;
+  SHOO_BASE_URL: string;
 };
 
 function getRequiredEnv(name: string): string {
@@ -53,4 +54,5 @@ export const env: Env = {
   CORS_ORIGIN: process.env.CORS_ORIGIN ?? "http://localhost:5173",
   MONGO_URI:
     process.env.MONGO_URI ?? "mongodb://localhost:27017/flowly",
+  SHOO_BASE_URL: process.env.SHOO_BASE_URL ?? "https://shoo.dev",
 };

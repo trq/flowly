@@ -3,11 +3,13 @@ import { MongoMemoryServer } from "mongodb-memory-server";
 import { connectDb, disconnectDb } from "../../../src/db/client";
 import {
   getSubscriberCountForTests,
+  getCurrentSeq,
   publish,
   type AppEvent,
 } from "../../../src/events/bus";
 import { ensureIndexes } from "../../../src/events/store";
 import { handleEventsGet } from "../../../src/http/events/controller";
+import { startBudgetOnboarding } from "../../../src/onboarding/service";
 
 const decoder = new TextDecoder();
 
@@ -152,5 +154,82 @@ describe("events SSE controller", () => {
       await connectDb(mongod.getUri());
       await ensureIndexes();
     }
+  });
+
+  test("startup includes onboarding snapshot for user with active onboarding session", async () => {
+    const userId = "ps_events_onboarding_user";
+    const started = await startBudgetOnboarding({ userId });
+
+    const response = handleEventsGet(
+      new Request("http://localhost/events", {
+        headers: { "x-flowly-user-id": userId },
+      }),
+    );
+    const frames = await collectSseFrames(response, 4);
+    const parsed = frames.map(parseSseFrame);
+
+    const snapshot = parsed.find(({ data }) => {
+      if (!isRecord(data)) return false;
+      return data.channel === "onboarding" && data.type === "onboarding.snapshot";
+    });
+
+    expect(snapshot).toBeDefined();
+    expect(snapshot!.id).toBeNull();
+    expect(snapshot!.data).toEqual(
+      expect.objectContaining({
+        channel: "onboarding",
+        type: "onboarding.snapshot",
+        payload: expect.objectContaining({
+          sessionId: started.sessionId,
+          userId,
+          status: "active",
+        }),
+      }),
+    );
+  });
+
+  test("replay filters user-scoped events to the authenticated user", async () => {
+    const userA = "ps_events_user_a";
+    const userB = "ps_events_user_b";
+    const boundary = await getCurrentSeq();
+
+    const eventA: AppEvent = {
+      id: crypto.randomUUID(),
+      channel: "budgets",
+      type: "budgets.created",
+      payload: { budgetId: crypto.randomUUID(), userId: userA },
+      sentAt: new Date().toISOString(),
+    };
+    const eventB: AppEvent = {
+      id: crypto.randomUUID(),
+      channel: "budgets",
+      type: "budgets.created",
+      payload: { budgetId: crypto.randomUUID(), userId: userB },
+      sentAt: new Date().toISOString(),
+    };
+
+    await publish(eventA);
+    await publish(eventB);
+
+    const response = handleEventsGet(
+      new Request("http://localhost/events", {
+        headers: {
+          "Last-Event-ID": String(boundary),
+          "x-flowly-user-id": userA,
+        },
+      }),
+    );
+    const frames = await collectSseFrames(response, 3);
+    const parsed = frames.map(parseSseFrame);
+
+    const seenA = parsed.find(
+      ({ data }) => isRecord(data) && data.id === eventA.id,
+    );
+    const seenB = parsed.find(
+      ({ data }) => isRecord(data) && data.id === eventB.id,
+    );
+
+    expect(seenA).toBeDefined();
+    expect(seenB).toBeUndefined();
   });
 });

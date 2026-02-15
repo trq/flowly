@@ -20,13 +20,17 @@ Jobs are the abstraction that decouples "something needs to happen" from "how an
 
 An **event** is a fact about something that happened. Events flow from the backend to the frontend via the SSE stream (`GET /events`) and drive UI updates. Events are the _only_ mechanism for pushing state changes to the client — there is no polling or refetching.
 
+### Agents
+
+An **agent** (for example, an onboarding `ToolLoopAgent`) is an orchestration layer for model/tool loops. It is not a new persistence primitive: agents still execute tools, create jobs, and publish events using the same commands/jobs/events architecture.
+
 ## How they relate
 
 ```mermaid
 flowchart LR
   subgraph Sources["Work sources"]
     Slash["/command"]
-    Tool["LLM tool call"]
+    Tool["Agent/LLM tool call"]
   end
 
   subgraph Processing

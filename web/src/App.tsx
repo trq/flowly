@@ -6,7 +6,7 @@ import { FLOWLY_EVENT_NAME } from '@/lib/events'
 import { isSessionLogoutEvent } from '@/components/layout/events'
 
 const rawApiBaseUrl = import.meta.env.VITE_API_URL?.trim().replace(/\/$/, '')
-const eventsApiPath = rawApiBaseUrl ? `${rawApiBaseUrl}/events` : '/events'
+const eventsApiBasePath = rawApiBaseUrl ? `${rawApiBaseUrl}/events` : '/events'
 
 export default function App() {
   const { identity, loading, signIn, clearIdentity } = useShooAuth()
@@ -14,9 +14,11 @@ export default function App() {
   const handleLogout = useCallback(() => clearIdentity(), [clearIdentity])
 
   useEffect(() => {
-    if (!identity.userId) return
+    if (!identity.userId || !identity.token) return
 
-    const eventSource = new EventSource(eventsApiPath)
+    const eventSource = new EventSource(
+      `${eventsApiBasePath}?access_token=${encodeURIComponent(identity.token)}`
+    )
 
     eventSource.onmessage = (event) => {
       let parsed: unknown
@@ -39,7 +41,7 @@ export default function App() {
     return () => {
       eventSource.close()
     }
-  }, [identity.userId])
+  }, [identity.userId, identity.token])
 
   useEffect(() => {
     if (!identity.userId) return

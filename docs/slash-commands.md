@@ -30,7 +30,7 @@ sequenceDiagram
 ### Key design decisions
 
 - **Backend is the source of truth.** Commands are registered in the API, and the frontend discovers them via a `commands.snapshot` SSE event on connection. No command list is hardcoded on the frontend.
-- **Commands are intercepted before the LLM.** When `POST /chat` receives a message starting with `/`, it checks the registry before routing to the language model. If a command matches, the LLM is skipped entirely.
+- **Commands are intercepted before the default chat LLM path.** When `POST /chat` receives a message starting with `/`, it checks the registry before routing to normal chat generation. If a command matches, the default path is skipped, and the command can either return inline output or delegate to a specialized runtime (for example, a dedicated onboarding agent flow).
 - **Responses use the ai-sdk streaming protocol.** Command responses are returned via `createUIMessageStreamResponse`, so they render as normal assistant messages in the chat.
 - **Side effects flow through the event bus.** Commands that need to trigger client-side behavior (like logout) publish events to the bus, which persists them with `seq` IDs and fans out to SSE connections.
 
@@ -64,7 +64,7 @@ register({
 });
 ```
 
-The `handler` function receives the argument string (text after the command name) and returns the response text that will be shown as an assistant message. Handlers may be `async` if they need to perform side effects like publishing events.
+The `handler` function receives the argument string (text after the command name) and returns the response text that will be shown as an assistant message. Handlers may be `async` if they need to perform side effects like publishing events or triggering specialized orchestration flows.
 
 ### 2. Import it in the barrel file
 
