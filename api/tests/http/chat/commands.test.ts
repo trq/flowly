@@ -1,8 +1,27 @@
-import { describe, test, expect, beforeAll } from "bun:test";
-import { parseSlashCommand, handleSlashCommand } from "../../../src/http/chat/commands";
+import { describe, test, expect, beforeAll, afterAll } from "bun:test";
+import { MongoMemoryServer } from "mongodb-memory-server";
+import { connectDb, disconnectDb } from "../../../src/db/client";
+import { ensureIndexes } from "../../../src/events/store";
+import {
+  parseSlashCommand,
+  handleSlashCommand,
+} from "../../../src/http/chat/commands";
 
 // Ensure the logout command is registered
-import "../../../src/commands/logout";
+import "../../../src/slash/commands/logout";
+
+let mongod: MongoMemoryServer;
+
+beforeAll(async () => {
+  mongod = await MongoMemoryServer.create();
+  await connectDb(mongod.getUri());
+  await ensureIndexes();
+});
+
+afterAll(async () => {
+  await disconnectDb();
+  await mongod.stop();
+});
 
 describe("parseSlashCommand", () => {
   test("parses a simple command", () => {
@@ -42,17 +61,17 @@ describe("parseSlashCommand", () => {
 describe("handleSlashCommand", () => {
   const headers = { "access-control-allow-origin": "*" };
 
-  test("returns a Response for a registered command", () => {
+  test("returns a Response for a registered command", async () => {
     const parsed = parseSlashCommand("/logout")!;
-    const response = handleSlashCommand(parsed, headers);
+    const response = await handleSlashCommand(parsed, headers);
 
     expect(response).toBeInstanceOf(Response);
     expect(response!.headers.get("access-control-allow-origin")).toBe("*");
   });
 
-  test("returns null for an unknown command", () => {
+  test("returns null for an unknown command", async () => {
     const parsed = { command: "unknown", args: "" };
-    const response = handleSlashCommand(parsed, headers);
+    const response = await handleSlashCommand(parsed, headers);
 
     expect(response).toBeNull();
   });

@@ -2,7 +2,7 @@ import {
   createUIMessageStream,
   createUIMessageStreamResponse,
 } from "ai";
-import { resolve } from "../../commands";
+import { resolve } from "../../slash";
 
 type SlashCommand = {
   command: string;
@@ -24,14 +24,14 @@ export function parseSlashCommand(text: string): SlashCommand | null {
   };
 }
 
-export function handleSlashCommand(
+export async function handleSlashCommand(
   parsed: SlashCommand,
   headers: Record<string, string>,
-): Response | null {
+): Promise<Response | null> {
   const definition = resolve(parsed.command);
   if (!definition) return null;
 
-  const text = definition.handler(parsed.args);
+  const text = await definition.handler(parsed.args);
 
   return createUIMessageStreamResponse({
     headers,

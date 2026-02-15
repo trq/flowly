@@ -1,12 +1,12 @@
-import { publish } from "../events/bus";
-import { register } from "./registry";
+import { publish } from "../../events/bus";
+import { register } from "../registry";
 
 register({
   name: "logout",
   description: "Sign out of Flowly",
-  handler() {
-    publish({
-      id: `evt_session_logout_${Date.now()}`,
+  async handler() {
+    await publish({
+      id: crypto.randomUUID(),
       channel: "session",
       type: "session.logout",
       payload: {},

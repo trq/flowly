@@ -49,7 +49,7 @@ export async function handleChatPost(request: Request): Promise<Response> {
 
   const parsed = parseSlashCommand(lastMessageText);
   if (parsed) {
-    const commandResponse = handleSlashCommand(parsed, streamHeaders);
+    const commandResponse = await handleSlashCommand(parsed, streamHeaders);
     if (commandResponse) return commandResponse;
   }
 

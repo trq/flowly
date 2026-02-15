@@ -1,5 +1,5 @@
 // Import command modules to trigger registration
-import "./logout";
+import "./commands/logout";
 
 // Re-export registry helpers
 export { list, resolve } from "./registry";

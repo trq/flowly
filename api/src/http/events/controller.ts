@@ -1,11 +1,23 @@
-import { list as listCommands } from "../../commands";
+import { list as listCommands } from "../../slash";
 import { env } from "../../config/env";
-import { subscribe, unsubscribe, type AppEvent } from "../../events/bus";
+import {
+  getCurrentSeq,
+  subscribe,
+  unsubscribe,
+  getEventsSince,
+  type AppEvent,
+} from "../../events/bus";
 
 const encoder = new TextEncoder();
 
-function encodeSseData(id: number, payload: unknown): Uint8Array {
-  return encoder.encode(`id: ${id}\ndata: ${JSON.stringify(payload)}\n\n`);
+function encodeSseSnapshot(payload: unknown): Uint8Array {
+  return encoder.encode(`data: ${JSON.stringify(payload)}\n\n`);
+}
+
+function encodeSseEvent(seq: number, payload: unknown): Uint8Array {
+  return encoder.encode(
+    `id: ${seq}\ndata: ${JSON.stringify(payload)}\n\n`,
+  );
 }
 
 function buildIncomeVsSavingsMetricSpec() {
@@ -25,44 +37,108 @@ function buildIncomeVsSavingsMetricSpec() {
   };
 }
 
-export function handleEventsGet(): Response {
-  let nextEventId = 1;
+export function handleEventsGet(request: Request): Response {
+  const lastEventId = request.headers.get("Last-Event-ID");
+  const lastSeq =
+    lastEventId && /^\d+$/.test(lastEventId)
+      ? Number(lastEventId)
+      : null;
+
   let heartbeatInterval: ReturnType<typeof setInterval> | undefined;
   let onBusEvent: ((event: AppEvent) => void) | undefined;
 
   const stream = new ReadableStream<Uint8Array>({
-    start(controller) {
-      controller.enqueue(
-        encodeSseData(nextEventId++, {
-          channel: "metrics",
-          id: "evt_metrics_income_vs_savings",
-          payload: {
-            metricId: "income-vs-savings",
-            spec: buildIncomeVsSavingsMetricSpec(),
-          },
-          sentAt: new Date().toISOString(),
-          type: "metrics.upsert",
-        }),
-      );
+    async start(controller) {
+      const buffer: AppEvent[] = [];
+      let streaming = false;
 
-      controller.enqueue(
-        encodeSseData(nextEventId++, {
-          channel: "commands",
-          id: "evt_commands_snapshot",
-          payload: { commands: listCommands() },
-          sentAt: new Date().toISOString(),
-          type: "commands.snapshot",
-        }),
-      );
+      try {
+        const replayFromSeq = lastSeq ?? (await getCurrentSeq());
 
-      onBusEvent = (event: AppEvent) => {
-        controller.enqueue(encodeSseData(nextEventId++, event));
-      };
-      subscribe(onBusEvent);
+        // On first connect, emit a cursor event with the current seq so reconnect
+        // replay can start from a known boundary even before any live events.
+        if (lastSeq === null) {
+          controller.enqueue(
+            encodeSseEvent(replayFromSeq, {
+              channel: "events",
+              id: crypto.randomUUID(),
+              payload: { seq: replayFromSeq },
+              sentAt: new Date().toISOString(),
+              type: "events.cursor",
+            }),
+          );
+        }
 
-      heartbeatInterval = setInterval(() => {
-        controller.enqueue(encoder.encode(`: heartbeat\n\n`));
-      }, 30_000);
+        // 1. Send snapshots (no SSE id)
+        controller.enqueue(
+          encodeSseSnapshot({
+            channel: "metrics",
+            id: crypto.randomUUID(),
+            payload: {
+              metricId: "income-vs-savings",
+              spec: buildIncomeVsSavingsMetricSpec(),
+            },
+            sentAt: new Date().toISOString(),
+            type: "metrics.upsert",
+          }),
+        );
+
+        controller.enqueue(
+          encodeSseSnapshot({
+            channel: "commands",
+            id: crypto.randomUUID(),
+            payload: { commands: listCommands() },
+            sentAt: new Date().toISOString(),
+            type: "commands.snapshot",
+          }),
+        );
+
+        // 2. Subscribe to live bus first, buffer events
+        onBusEvent = (event: AppEvent) => {
+          if (streaming) {
+            controller.enqueue(encodeSseEvent(event.seq!, event));
+          } else {
+            buffer.push(event);
+          }
+        };
+        subscribe(onBusEvent);
+
+        // 3. Replay from DB from the selected boundary
+        const missed = await getEventsSince(replayFromSeq);
+        const replayedSeqs = new Set<number>();
+
+        for (const event of missed) {
+          controller.enqueue(encodeSseEvent(event.seq!, event));
+          replayedSeqs.add(event.seq!);
+        }
+
+        // 4. Flush buffer, dedup against replayed events
+        for (const event of buffer) {
+          if (!replayedSeqs.has(event.seq!)) {
+            controller.enqueue(encodeSseEvent(event.seq!, event));
+          }
+        }
+
+        // Switch to direct streaming
+        buffer.length = 0;
+        streaming = true;
+
+        heartbeatInterval = setInterval(() => {
+          controller.enqueue(encoder.encode(`: heartbeat\n\n`));
+        }, 30_000);
+      } catch (error) {
+        if (onBusEvent) {
+          unsubscribe(onBusEvent);
+          onBusEvent = undefined;
+        }
+
+        if (heartbeatInterval) {
+          clearInterval(heartbeatInterval);
+          heartbeatInterval = undefined;
+        }
+
+        throw error;
+      }
     },
     cancel() {
       if (onBusEvent) unsubscribe(onBusEvent);

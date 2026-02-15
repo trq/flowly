@@ -9,6 +9,7 @@ type Env = {
   OPENROUTER_API_KEY: string;
   OPENROUTER_BASE_URL?: string;
   CORS_ORIGIN: string;
+  MONGO_URI: string;
 };
 
 function getRequiredEnv(name: string): string {
@@ -50,4 +51,6 @@ export const env: Env = {
   OPENROUTER_API_KEY: getRequiredEnv("OPENROUTER_API_KEY"),
   OPENROUTER_BASE_URL: process.env.OPENROUTER_BASE_URL,
   CORS_ORIGIN: process.env.CORS_ORIGIN ?? "http://localhost:5173",
+  MONGO_URI:
+    process.env.MONGO_URI ?? "mongodb://localhost:27017/flowly",
 };
