@@ -4,6 +4,13 @@ import type { AppEvent } from "./bus";
 type CounterDoc = { _id: string; seq: number };
 type EventDoc = { _id: string; seq: number; event: AppEvent; storedAt: Date };
 
+export async function getCurrentSeq(): Promise<number> {
+  const counter = await getDb()
+    .collection<CounterDoc>("counters")
+    .findOne({ _id: "events" });
+  return counter?.seq ?? 0;
+}
+
 export async function nextSeq(): Promise<number> {
   const result = await getDb()
     .collection<CounterDoc>("counters")

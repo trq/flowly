@@ -1,4 +1,4 @@
-import { nextSeq, insertEvent, getEventsSince } from "./store";
+import { nextSeq, insertEvent, getCurrentSeq, getEventsSince } from "./store";
 
 export type AppEvent = {
   id: string;
@@ -31,4 +31,8 @@ export function unsubscribe(callback: Subscriber): void {
   subscribers.delete(callback);
 }
 
-export { getEventsSince };
+export function getSubscriberCountForTests(): number {
+  return subscribers.size;
+}
+
+export { getCurrentSeq, getEventsSince };
