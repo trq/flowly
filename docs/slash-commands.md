@@ -13,7 +13,7 @@ sequenceDiagram
   participant Events as GET /events (SSE)
 
   Web->>Events: Open stream on page load
-  Events-->>Web: commands.snapshot (available commands)
+  Events-->>Web: startup events (includes commands.snapshot)
 
   Web->>Web: User types "/" → autocomplete menu appears
   Web->>Chat: User selects /logout
@@ -32,7 +32,7 @@ sequenceDiagram
 - **Backend is the source of truth.** Commands are registered in the API, and the frontend discovers them via a `commands.snapshot` SSE event on connection. No command list is hardcoded on the frontend.
 - **Commands are intercepted before the LLM.** When `POST /chat` receives a message starting with `/`, it checks the registry before routing to the language model. If a command matches, the LLM is skipped entirely.
 - **Responses use the ai-sdk streaming protocol.** Command responses are returned via `createUIMessageStreamResponse`, so they render as normal assistant messages in the chat.
-- **Side effects flow through the event bus.** Commands that need to trigger client-side behavior (like logout) publish events to the bus, which fans out to all SSE connections.
+- **Side effects flow through the event bus.** Commands that need to trigger client-side behavior (like logout) publish events to the bus, which persists them with `seq` IDs and fans out to SSE connections.
 
 ### Why an interface, not an abstract class
 
@@ -153,8 +153,11 @@ api/tests/
 │   └── store.test.ts        # Event store persistence
 ├── db/
 │   └── client.test.ts       # MongoDB connection
-└── http/chat/
-    └── commands.test.ts     # Slash command parsing + handling
+└── http/
+    ├── chat/
+    │   └── commands.test.ts     # Slash command parsing + handling
+    └── events/
+        └── controller.test.ts   # SSE cursor + replay behavior
 
 web/tests/
 └── components/layout/

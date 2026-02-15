@@ -55,8 +55,8 @@ Separates DB operations from pub/sub logic. Exports:
 
 ### 6. Make command handlers async — ripple from async `publish()`
 
-- `api/src/commands/registry.ts` — `CommandHandler` type becomes `(args: string) => string | Promise<string>`
-- `api/src/commands/logout.ts` — handler becomes `async`, awaits `publish()`
+- `api/src/slash/registry.ts` — `CommandHandler` type becomes `(args: string) => string | Promise<string>`
+- `api/src/slash/commands/logout.ts` — handler becomes `async`, awaits `publish()`
 - `api/src/http/chat/commands.ts` — `handleSlashCommand` becomes `async`, awaits `definition.handler()`
 - `api/src/http/chat/controller.ts` — awaits `handleSlashCommand()`
 
@@ -91,8 +91,8 @@ Wrap in `async main()`: connect to MongoDB, call `ensureIndexes()`, then `Bun.se
 | `api/src/db/client.ts` | **Create** — connection management |
 | `api/src/events/store.ts` | **Create** — event DB operations (nextSeq, insert, query, indexes) |
 | `api/src/events/bus.ts` | **Edit** — async publish with persistence, add `seq` to AppEvent |
-| `api/src/commands/registry.ts` | **Edit** — CommandHandler allows async return |
-| `api/src/commands/logout.ts` | **Edit** — async handler, await publish |
+| `api/src/slash/registry.ts` | **Edit** — CommandHandler allows async return |
+| `api/src/slash/commands/logout.ts` | **Edit** — async handler, await publish |
 | `api/src/http/chat/commands.ts` | **Edit** — async handleSlashCommand, await handler |
 | `api/src/http/chat/controller.ts` | **Edit** — await handleSlashCommand |
 | `api/src/http/events/controller.ts` | **Edit** — accept request, replay logic, split SSE encoding |

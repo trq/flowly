@@ -59,69 +59,67 @@ flowchart LR
 ### `GET /events` (SSE)
 
 - Long-lived server-to-client stream
-- First event should be a snapshot of current app-visible state
-- Subsequent events are incremental updates
+- On first connect (no `Last-Event-ID`), emits `events.cursor` with the current sequence as SSE `id`
+- Sends startup snapshots without SSE `id` (currently `metrics.upsert` + `commands.snapshot`)
+- Replays persisted events where `seq > Last-Event-ID` when reconnecting
+- Streams live bus events with SSE `id` set to `seq`
 - Intended for panel updates and notices, not primary token streaming
-- Current implementation example: emits one initial `metrics.upsert` event containing a json-render spec
+- Includes heartbeat comments to keep long-lived connections healthy
 
-## Delivery Model (MVP)
+## Delivery Model (Current)
 
-For now, use a small in-process event bus. Do not treat the event stream itself as a durable source of truth.
+The event bus is Mongo-backed for durability and still uses in-memory pub/sub for low-latency fan-out.
 
-- Source of truth remains the database (users, metrics, onboarding state, etc.)
-- `/events` is a delivery channel for near-real-time UI updates
-- On new SSE connection, send a snapshot built from DB reads
-- During `POST /chat`, after domain changes are written, publish events to the in-memory bus
+- Source of truth for domain data remains the primary DB collections
+- `publish()` assigns a monotonic `seq`, persists to `events`, then fans out to subscribers
+- `/events` combines startup snapshots + DB replay + live in-memory fan-out
+- Startup snapshots are regenerated on each connection and are not replayed from storage
 
 ```mermaid
 flowchart LR
-  Chat["POST /chat"] --> DB["Database (source of truth)"]
-  Chat --> Bus["In-memory Event Bus"]
-  Bus --> SSE["GET /events clients"]
-  DB --> SSE
+  Chat["POST /chat"] --> DomainDB["Domain data"]
+  Chat --> Bus["Event Bus (publish)"]
+  Bus --> EventDB["Mongo events + counters"]
+  Bus --> SSE["GET /events live stream"]
+  EventDB --> SSE["Replay (Last-Event-ID)"]
 ```
 
-This provides a simple and robust baseline:
+Reconnect behavior:
 
-- If an event is missed, reconnect + snapshot restores UI state
-- No replay log is required for initial implementation
+- First connect: server emits `events.cursor` at the current boundary before snapshot events
+- Reconnect: browser sends `Last-Event-ID`; server replays missed events from Mongo
+- Live events continue from in-memory fan-out after replay
 
-### When to Add Durable Event Storage
-
-Add persistence for events only when needed (not by default):
-
-- Multi-instance API deployment requires cross-instance fan-out
-- You need resume/replay semantics beyond reconnect + snapshot
-- You need audit/history guarantees for emitted UI events
-
-At that point, back the bus with a durable stream/outbox (for example: Redis Streams, Postgres outbox, NATS, Kafka).
-
-## Event Contract (Recommended)
+## Event Contract (Current)
 
 Send JSON in SSE `data:` using a single envelope:
 
 ```json
 {
-  "id": "evt_123",
-  "channel": "conversation",
-  "type": "notice",
-  "createdAt": "2026-02-12T08:30:00Z",
-  "payload": {}
+  "id": "a2c0f15d-f31d-4c9f-8f5d-2810af4ca7f2",
+  "channel": "session",
+  "type": "session.logout",
+  "payload": {},
+  "sentAt": "2026-02-12T08:30:00Z",
+  "seq": 42
 }
 ```
 
-Suggested `channel` values:
+`seq` is present on persisted/replayed bus events and is also emitted as the SSE `id`. Snapshot events are sent without SSE `id`.
 
-- `conversation`
+Current `channel` values:
+
+- `events`
+- `commands`
+- `session`
 - `metrics`
 
-Suggested `type` examples:
+Current `type` examples:
 
-- `snapshot`
-- `conversation.notice`
-- `conversation.system_message`
+- `events.cursor`
+- `commands.snapshot`
+- `session.logout`
 - `metrics.upsert`
-- `metrics.remove`
 
 ## Client Flow
 
@@ -134,7 +132,8 @@ sequenceDiagram
   participant LLM as "LLM Provider"
 
   Web->>Events: Open stream on page load
-  Events-->>Web: snapshot event
+  Events-->>Web: events.cursor + startup snapshots
+  Events-->>Web: replay (if Last-Event-ID provided)
 
   User->>Web: Submit prompt
   Web->>Chat: POST chat turn
@@ -143,7 +142,7 @@ sequenceDiagram
   Chat-->>Web: Streamed assistant message
 
   Chat-->>Events: Publish app event(s)
-  Events-->>Web: metrics/conversation updates
+  Events-->>Web: metrics/session/command updates
 ```
 
 ## Event Routing in the UI
@@ -151,9 +150,11 @@ sequenceDiagram
 ```mermaid
 flowchart TB
   Ev["Incoming SSE event"] --> Ch{"channel"}
-  Ch -->|conversation| ConvStore["Conversation Store/Reducer"]
+  Ch -->|commands| CmdStore["Commands list state"]
+  Ch -->|session| SessionHandler["Auth/session handler"]
   Ch -->|metrics| MetStore["Metrics Store/Reducer"]
-  ConvStore --> ConvUI["Conversation UI"]
+  CmdStore --> ConvUI["Conversation slash menu"]
+  SessionHandler --> AppAuth["clearIdentity()"]
   MetStore --> MetUI["Metrics UI"]
 ```
 

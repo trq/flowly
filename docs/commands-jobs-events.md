@@ -36,7 +36,7 @@ flowchart LR
 
   subgraph Delivery
     Bus["Event bus"]
-    DB["MongoDB"]
+    DB["MongoDB (events)"]
     SSE["GET /events"]
   end
 
@@ -45,14 +45,15 @@ flowchart LR
   Cmd -->|may create| Job
   Cmd -->|may publish| Bus
   Job -->|on completion| Bus
-  Bus --> DB
-  DB --> SSE
+  Bus -->|persist| DB
+  Bus -->|live fan-out| SSE
+  DB -->|replay| SSE
   SSE -->|typed events| Browser
 ```
 
-## Current state (v1)
+## Current state (v1.1)
 
-Commands execute inline and publish events directly. There is no job queue yet — the command handler _is_ the processor. Events are published to an in-memory bus which fans out to SSE connections.
+Commands execute inline and publish events directly. There is no job queue yet — the command handler _is_ the processor. Events are persisted to MongoDB with monotonic `seq` IDs, then fanned out to live SSE connections.
 
 ```mermaid
 sequenceDiagram
@@ -60,26 +61,30 @@ sequenceDiagram
   participant Chat as POST /chat
   participant Handler as Command handler
   participant Bus as Event bus
+  participant DB as MongoDB
   participant SSE as GET /events
 
   User->>Chat: /logout
   Chat->>Handler: resolve + execute
   Handler->>Bus: publish(session.logout)
+  Bus->>DB: assign seq + insert event
   Handler-->>Chat: "Signing out…"
   Chat-->>User: UIMessageStream
   Bus-->>SSE: fan out to clients
-  SSE-->>User: session.logout event
+  SSE-->>User: session.logout event (id=seq)
+
+  Note over SSE,User: Reconnect uses Last-Event-ID replay
 ```
 
-### Limitations of v1
+### Limitations of v1.1
 
-- **No durability.** Events exist only in memory. If the SSE connection drops and reconnects, events published during the gap are lost.
-- **No async processing.** All work happens inside the HTTP request. Long-running operations would block the response.
+- **No async processing.** All work still happens inside the HTTP request. Long-running operations would block the response.
 - **Single source.** Only slash commands can trigger side effects. The LLM cannot create jobs.
+- **No worker/job queue.** Job semantics are documented but not implemented yet.
 
-## Target state (v2)
+## Target state (v2: jobs + worker)
 
-MongoDB backs the event bus, providing persistence and SSE replay. Commands and LLM tool calls both create jobs. A worker process handles job execution asynchronously.
+Durable events and SSE replay remain as-is. The main change is moving side-effect execution to jobs processed by a worker, with both commands and LLM tool calls as job producers.
 
 ```mermaid
 sequenceDiagram
@@ -110,7 +115,6 @@ sequenceDiagram
 
 ### What v2 adds
 
-- **Durable events.** Events are persisted to MongoDB with a monotonic sequence number. The SSE endpoint replays missed events on reconnect using the standard `Last-Event-ID` header.
 - **Async job processing.** A worker polls MongoDB for pending jobs, executes them, and publishes completion events. The HTTP request returns immediately.
 - **Multiple work sources.** Both slash commands and LLM tool calls can create jobs in the same queue.
 
@@ -131,6 +135,8 @@ storedAt : Date   (for TTL expiry)
 ```
 
 `seq` is the SSE event ID. On reconnect, the client sends `Last-Event-ID: <seq>` and the server replays all events with `seq > lastSeq`.
+
+On first connection (no `Last-Event-ID`), the server emits `events.cursor` with the current `seq` boundary and then sends startup snapshots without SSE `id`.
 
 A TTL index on `storedAt` (24h) prevents unbounded growth.
 
@@ -154,6 +160,8 @@ Jobs are created by command handlers or LLM tool call handlers. The worker polls
 ## Migration path
 
 The system evolves incrementally. Each step is independently shippable.
+
+Current implementation on `main`: **v1.1**.
 
 ```mermaid
 flowchart TD
