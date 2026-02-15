@@ -9,6 +9,7 @@ import { ensureIndexes as ensureEventIndexes } from "../../../src/events/store";
 import { ensureIndexes as ensureBudgetIndexes } from "../../../src/budgets/store";
 import { ensureIndexes as ensureOnboardingIndexes } from "../../../src/onboarding/store";
 import { startBudgetOnboarding } from "../../../src/onboarding/service";
+import { buildBudgetOnboardingFormSpec } from "../../../src/onboarding/ui-spec";
 import {
   isBudgetOnboardingStartIntent,
   routeBudgetOnboardingIfApplicable,
@@ -94,6 +95,7 @@ describe("budget onboarding agent router", () => {
 
   test("routes /new budget into onboarding and returns onboarding form data part", async () => {
     const userId = "ps_router_new_budget";
+    let invoked = false;
     const response = await routeBudgetOnboardingIfApplicable({
       headers: { "access-control-allow-origin": "*" },
       lastMessageText: "/new budget",
@@ -106,7 +108,22 @@ describe("budget onboarding agent router", () => {
       ],
       parsedSlash: { args: "budget", command: "new" },
       userId,
+      runStartWithAgent: async ({ userId: agentUserId }) => {
+        invoked = true;
+        const started = await startBudgetOnboarding({ userId: agentUserId });
+
+        return {
+          sessionId: started.sessionId,
+          spec: buildBudgetOnboardingFormSpec({
+            sessionId: started.sessionId,
+            draft: started.draft,
+          }),
+          text: "Starting budget onboarding. Let's set up your budget.",
+        };
+      },
     });
+
+    expect(invoked).toBe(true);
 
     expect(response).toBeInstanceOf(Response);
     const chunks = await collectUiChunks(response!, 4);

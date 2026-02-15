@@ -7,11 +7,12 @@ import type {
   BudgetOnboardingCadence,
   BudgetOnboardingSubmitData,
 } from "@flowly/contracts/onboarding";
-import { findActiveSessionByUserId } from "../../onboarding/store";
 import {
-  startBudgetOnboarding,
-  submitInitialBudgetOnboarding,
-} from "../../onboarding/service";
+  runBudgetOnboardingAgentStart,
+  type BudgetOnboardingAgentStartResult,
+} from "../../agents/budget-onboarding-agent";
+import { findActiveSessionByUserId } from "../../onboarding/store";
+import { submitInitialBudgetOnboarding } from "../../onboarding/service";
 import { buildBudgetOnboardingFormSpec } from "../../onboarding/ui-spec";
 
 type ParsedSlash = {
@@ -25,6 +26,10 @@ type RouteBudgetOnboardingInput = {
   lastMessageText: string;
   parsedSlash: ParsedSlash;
   userId: string | null;
+  runStartWithAgent?: (input: {
+    userId: string;
+    prompt: string;
+  }) => Promise<BudgetOnboardingAgentStartResult>;
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -202,18 +207,29 @@ export async function routeBudgetOnboardingIfApplicable(
     );
   }
 
-  const started = await startBudgetOnboarding({ userId: input.userId });
-  const spec = buildBudgetOnboardingFormSpec({
-    sessionId: started.sessionId,
-    draft: started.draft,
-  });
+  const prompt = slashStart
+    ? "Start budget onboarding."
+    : input.lastMessageText.trim() || "Continue budget onboarding.";
 
-  return streamAssistantMessage(
-    input.headers,
-    "Starting budget onboarding. Let's set up your budget.",
-    {
+  try {
+    const started = await (input.runStartWithAgent ??
+      runBudgetOnboardingAgentStart)({
+      userId: input.userId,
+      prompt,
+    });
+
+    return streamAssistantMessage(input.headers, started.text, {
       sessionId: started.sessionId,
-      spec,
-    },
-  );
+      spec: started.spec,
+    });
+  } catch (error) {
+    const message =
+      error instanceof Error
+        ? error.message
+        : "Unable to start budget onboarding.";
+    return streamAssistantMessage(
+      input.headers,
+      `Couldn't start budget onboarding yet: ${message}`,
+    );
+  }
 }
