@@ -16,6 +16,7 @@ import {
   validatePayCycleDay,
   validateTimezone,
 } from "./validation";
+import { buildBudgetOnboardingFormSpec } from "./ui-spec";
 
 type StartBudgetOnboardingInput = {
   userId: string;
@@ -103,6 +104,10 @@ export async function startBudgetOnboarding(
       currentStep: session.currentStep,
       status: session.status,
       draft: session.draft,
+      uiSpec: buildBudgetOnboardingFormSpec({
+        sessionId: session._id,
+        draft: session.draft,
+      }),
     },
     sentAt: new Date().toISOString(),
   });

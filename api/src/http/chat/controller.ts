@@ -3,6 +3,7 @@ import { env } from "../../config/env";
 import { getChatModel } from "../../llm/model";
 import { handleSlashCommand, parseSlashCommand } from "./commands";
 import { resolveRequestIdentity } from "../../auth/identity";
+import { maybeRouteToBudgetOnboarding } from "./agent-router";
 function json(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
     status,
@@ -48,8 +49,17 @@ export async function handleChatPost(request: Request): Promise<Response> {
   };
 
   const parsed = parseSlashCommand(lastMessageText);
+  const identity = await resolveRequestIdentity(request);
+  const onboardingResponse = await maybeRouteToBudgetOnboarding({
+    headers: streamHeaders,
+    messages: body.messages,
+    lastMessageText,
+    parsedSlash: parsed,
+    userId: identity.userId,
+  });
+  if (onboardingResponse) return onboardingResponse;
+
   if (parsed) {
-    const identity = await resolveRequestIdentity(request);
     const commandResponse = await handleSlashCommand(parsed, streamHeaders, {
       userId: identity.userId,
     });

@@ -1,7 +1,8 @@
 import { DefaultChatTransport } from "ai";
 import { useChat } from "@ai-sdk/react";
+import type { Spec } from "@json-render/react";
 import { MessageSquareIcon } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useShooAuth } from "@shoojs/react";
 import {
   Conversation as AIConversation,
@@ -23,7 +24,20 @@ import {
 } from "@/components/ai-elements/prompt-input";
 import { Card } from "@/components/ui/card";
 import { FLOWLY_EVENT_NAME } from "@/lib/events";
-import { isCommandsSnapshotEvent, type CommandInfo } from "./events";
+import OnboardingRenderer from "@/components/onboarding/OnboardingRenderer";
+import {
+  FLOWLY_BUDGET_ONBOARDING_SUBMIT_EVENT,
+  type BudgetOnboardingSubmitPayload,
+} from "@/components/onboarding/events";
+import {
+  isAnyOnboardingEvent,
+  isCommandsSnapshotEvent,
+  isOnboardingCancelledEvent,
+  isOnboardingCompletedEvent,
+  isOnboardingSnapshotEvent,
+  isOnboardingStartedEvent,
+  type CommandInfo,
+} from "./events";
 import SlashCommandMenu, {
   type SlashCommandMenuHandle,
 } from "./SlashCommandMenu";
@@ -31,9 +45,59 @@ import SlashCommandMenu, {
 const rawApiBaseUrl = import.meta.env.VITE_API_URL?.trim().replace(/\/$/, "");
 const chatApiPath = rawApiBaseUrl ? `${rawApiBaseUrl}/chat` : "/chat";
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function isSpec(value: unknown): value is Spec {
+  return (
+    isRecord(value) &&
+    typeof value.root === "string" &&
+    isRecord(value.elements)
+  );
+}
+
+function isBudgetOnboardingSubmitPayload(
+  value: unknown,
+): value is BudgetOnboardingSubmitPayload {
+  if (!isRecord(value)) return false;
+
+  return (
+    typeof value.sessionId === "string" &&
+    typeof value.name === "string" &&
+    (value.cadence === "weekly" ||
+      value.cadence === "fortnightly" ||
+      value.cadence === "monthly") &&
+    typeof value.day === "number" &&
+    Number.isFinite(value.day) &&
+    typeof value.timezone === "string"
+  );
+}
+
+function readOnboardingFormPart(
+  part: unknown,
+): { sessionId: string; spec: Spec } | null {
+  if (!isRecord(part)) return null;
+  if (part.type !== "data-budget-onboarding-form") return null;
+  if (!("data" in part) || !isRecord(part.data)) return null;
+  if (typeof part.data.sessionId !== "string") return null;
+  if (!isSpec(part.data.spec)) return null;
+
+  return {
+    sessionId: part.data.sessionId,
+    spec: part.data.spec,
+  };
+}
+
 export default function Conversation() {
   const [input, setInput] = useState("");
   const [commands, setCommands] = useState<CommandInfo[]>([]);
+  const [activeOnboardingSessionId, setActiveOnboardingSessionId] = useState<
+    string | null
+  >(null);
+  const [onboardingSpecsBySessionId, setOnboardingSpecsBySessionId] = useState<
+    Record<string, Spec>
+  >({});
   const menuRef = useRef<SlashCommandMenuHandle>(null);
   const { identity } = useShooAuth();
   const { messages, sendMessage, status, stop } = useChat({
@@ -49,14 +113,92 @@ export default function Conversation() {
   useEffect(() => {
     const onAppEvent = (event: Event) => {
       const detail = (event as CustomEvent<unknown>).detail;
+
       if (isCommandsSnapshotEvent(detail)) {
         setCommands(detail.payload.commands);
+        return;
+      }
+
+      if (!isAnyOnboardingEvent(detail)) {
+        return;
+      }
+
+      if (isOnboardingSnapshotEvent(detail) || isOnboardingStartedEvent(detail)) {
+        setActiveOnboardingSessionId(detail.payload.sessionId);
+
+        const uiSpec = detail.payload.uiSpec;
+        if (isSpec(uiSpec)) {
+          setOnboardingSpecsBySessionId((previous) => ({
+            ...previous,
+            [detail.payload.sessionId]: uiSpec,
+          }));
+        }
+        return;
+      }
+
+      if (isOnboardingCompletedEvent(detail) || isOnboardingCancelledEvent(detail)) {
+        setActiveOnboardingSessionId((previous) =>
+          previous === detail.payload.sessionId ? null : previous,
+        );
+        setOnboardingSpecsBySessionId((previous) => {
+          const next = { ...previous };
+          delete next[detail.payload.sessionId];
+          return next;
+        });
       }
     };
 
     window.addEventListener(FLOWLY_EVENT_NAME, onAppEvent);
     return () => window.removeEventListener(FLOWLY_EVENT_NAME, onAppEvent);
   }, []);
+
+  useEffect(() => {
+    const onSubmit = (event: Event) => {
+      const detail = (event as CustomEvent<unknown>).detail;
+      if (!isBudgetOnboardingSubmitPayload(detail)) return;
+
+      sendMessage({
+        parts: [
+          {
+            type: "data-budget-onboarding-submit",
+            data: detail,
+          },
+        ],
+      });
+    };
+
+    window.addEventListener(FLOWLY_BUDGET_ONBOARDING_SUBMIT_EVENT, onSubmit);
+    return () =>
+      window.removeEventListener(FLOWLY_BUDGET_ONBOARDING_SUBMIT_EVENT, onSubmit);
+  }, [sendMessage]);
+
+  const onboardingSpecsFromMessages = useMemo(() => {
+    let latestSessionId: string | null = null;
+
+    const bySessionId = messages.reduce<Record<string, Spec>>((result, message) => {
+      for (const part of message.parts) {
+        const parsed = readOnboardingFormPart(part);
+        if (!parsed) continue;
+        result[parsed.sessionId] = parsed.spec;
+        latestSessionId = parsed.sessionId;
+      }
+      return result;
+    }, {});
+
+    return {
+      bySessionId,
+      latestSessionId,
+    };
+  }, [messages]);
+
+  const effectiveOnboardingSessionId =
+    activeOnboardingSessionId ?? onboardingSpecsFromMessages.latestSessionId;
+
+  const activeOnboardingSpec = effectiveOnboardingSessionId
+    ? onboardingSpecsFromMessages.bySessionId[effectiveOnboardingSessionId] ??
+      onboardingSpecsBySessionId[effectiveOnboardingSessionId] ??
+      null
+    : null;
 
   const showMenu = input.startsWith("/");
   const query = showMenu ? input.slice(1).toLowerCase() : "";
@@ -73,24 +215,37 @@ export default function Conversation() {
                 </div>
               </ConversationEmptyState>
             ) : (
-              messages.map((message) => (
-                <Message from={message.role} key={message.id}>
-                  <MessageContent>
-                    {message.parts.map((part, i) => {
-                      switch (part.type) {
-                        case "text":
-                          return (
-                            <MessageResponse key={`${message.id}-${i}`}>
-                              {part.text}
-                            </MessageResponse>
-                          );
-                        default:
-                          return null;
-                      }
-                    })}
-                  </MessageContent>
-                </Message>
-              ))
+              <>
+                {messages.map((message) => (
+                  <Message from={message.role} key={message.id}>
+                    <MessageContent>
+                      {message.parts.map((part, i) => {
+                        switch (part.type) {
+                          case "text":
+                            return (
+                              <MessageResponse key={`${message.id}-${i}`}>
+                                {part.text}
+                              </MessageResponse>
+                            );
+                          default:
+                            return null;
+                        }
+                      })}
+                    </MessageContent>
+                  </Message>
+                ))}
+
+                {effectiveOnboardingSessionId && activeOnboardingSpec && (
+                  <Message
+                    from="assistant"
+                    key={`onboarding-${effectiveOnboardingSessionId}`}
+                  >
+                    <MessageContent>
+                      <OnboardingRenderer spec={activeOnboardingSpec} />
+                    </MessageContent>
+                  </Message>
+                )}
+              </>
             )}
           </ConversationContent>
           <ConversationScrollButton />

@@ -2,6 +2,7 @@ import { list as listCommands } from "../../slash";
 import { env } from "../../config/env";
 import { findActiveSessionByUserId } from "../../onboarding/store";
 import { resolveRequestIdentity } from "../../auth/identity";
+import { buildBudgetOnboardingFormSpec } from "../../onboarding/ui-spec";
 import {
   getCurrentSeq,
   subscribe,
@@ -133,6 +134,10 @@ export function handleEventsGet(request: Request): Response {
                   sessionId: activeSession._id,
                   status: activeSession.status,
                   userId: activeSession.userId,
+                  uiSpec: buildBudgetOnboardingFormSpec({
+                    sessionId: activeSession._id,
+                    draft: activeSession.draft,
+                  }),
                 },
                 sentAt: new Date().toISOString(),
                 type: "onboarding.snapshot",

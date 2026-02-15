@@ -2,6 +2,11 @@ import { describe, test, expect } from "vitest";
 import {
   isSessionLogoutEvent,
   isCommandsSnapshotEvent,
+  isOnboardingSnapshotEvent,
+  isOnboardingStartedEvent,
+  isOnboardingCompletedEvent,
+  isOnboardingCancelledEvent,
+  isAnyOnboardingEvent,
 } from "@/components/layout/events";
 
 describe("isSessionLogoutEvent", () => {
@@ -87,5 +92,66 @@ describe("isCommandsSnapshotEvent", () => {
 
   test("returns false for null", () => {
     expect(isCommandsSnapshotEvent(null)).toBe(false);
+  });
+});
+
+describe("onboarding event guards", () => {
+  const basePayload = {
+    sessionId: "session-1",
+    status: "active",
+    userId: "ps_user_1",
+  };
+
+  test("recognizes onboarding snapshot event", () => {
+    const event = {
+      channel: "onboarding",
+      type: "onboarding.snapshot",
+      payload: { ...basePayload },
+    };
+
+    expect(isOnboardingSnapshotEvent(event)).toBe(true);
+    expect(isAnyOnboardingEvent(event)).toBe(true);
+  });
+
+  test("recognizes onboarding started event", () => {
+    const event = {
+      channel: "onboarding",
+      type: "onboarding.started",
+      payload: { ...basePayload },
+    };
+
+    expect(isOnboardingStartedEvent(event)).toBe(true);
+    expect(isAnyOnboardingEvent(event)).toBe(true);
+  });
+
+  test("recognizes onboarding completed event", () => {
+    const event = {
+      channel: "onboarding",
+      type: "onboarding.completed",
+      payload: { ...basePayload, status: "completed" },
+    };
+
+    expect(isOnboardingCompletedEvent(event)).toBe(true);
+    expect(isAnyOnboardingEvent(event)).toBe(true);
+  });
+
+  test("recognizes onboarding cancelled event", () => {
+    const event = {
+      channel: "onboarding",
+      type: "onboarding.cancelled",
+      payload: { ...basePayload, status: "cancelled" },
+    };
+
+    expect(isOnboardingCancelledEvent(event)).toBe(true);
+    expect(isAnyOnboardingEvent(event)).toBe(true);
+  });
+
+  test("returns false for onboarding event with missing payload", () => {
+    expect(
+      isAnyOnboardingEvent({
+        channel: "onboarding",
+        type: "onboarding.started",
+      }),
+    ).toBe(false);
   });
 });
