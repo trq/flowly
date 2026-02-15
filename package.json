@@ -7,7 +7,7 @@
     "api"
   ],
   "scripts": {
-    "dev": "bun run dev:all",
+    "dev": "bunx agent-tail run 'web: bun run --filter @flowly/web dev' 'api: bun run --if-present --filter @flowly/api dev'",
     "dev:web": "bun run --filter @flowly/web dev",
     "dev:api": "bun run --if-present --filter @flowly/api dev",
     "dev:all": "bun run --workspaces --if-present dev",
@@ -16,5 +16,8 @@
     "build:api": "bun run --if-present --filter @flowly/api build",
     "preview:web": "bun run --filter @flowly/web preview",
     "test": "bun run --workspaces --if-present test"
+  },
+  "devDependencies": {
+    "agent-tail": "^0.3.5"
   }
 }

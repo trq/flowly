@@ -2,9 +2,10 @@ import { fileURLToPath, URL } from 'node:url'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
+import agentTail from 'vite-plugin-agent-tail'
 
 export default defineConfig({
-  plugins: [react(), tailwindcss()],
+  plugins: [react(), tailwindcss(), agentTail()],
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
