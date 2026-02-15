@@ -1,23 +1,15 @@
-import type { PayCycleCadence } from "../budgets/store";
+import type {
+  BudgetOnboardingCadence,
+  BudgetOnboardingDayOption,
+  BudgetOnboardingFormSpecProps,
+} from "@flowly/contracts/onboarding";
 import { ISO_WEEKDAY_OPTIONS } from "./validation";
 
 type OnboardingSpecDraft = {
   name?: string;
-  cadence?: PayCycleCadence;
+  cadence?: BudgetOnboardingCadence;
   day?: number;
   timezone?: string;
-};
-
-type BudgetOnboardingFormElementProps = {
-  sessionId: string;
-  name: string;
-  cadence: PayCycleCadence;
-  day: number;
-  timezone: string;
-  cadenceOptions: Array<{ value: PayCycleCadence; label: string }>;
-  weekdayOptions: Array<{ value: number; label: string }>;
-  monthlyDayMin: number;
-  monthlyDayMax: number;
 };
 
 type BudgetOnboardingFormSpec = {
@@ -26,17 +18,25 @@ type BudgetOnboardingFormSpec = {
     string,
     {
       type: "BudgetOnboardingForm";
-      props: BudgetOnboardingFormElementProps;
+      props: BudgetOnboardingFormSpecProps;
       children: string[];
     }
   >;
 };
 
-const CADENCE_OPTIONS: Array<{ value: PayCycleCadence; label: string }> = [
+const CADENCE_OPTIONS: BudgetOnboardingFormSpecProps["cadenceOptions"] = [
   { value: "weekly", label: "Weekly" },
   { value: "fortnightly", label: "Fortnightly" },
   { value: "monthly", label: "Monthly" },
 ];
+
+const MONTHLY_DAY_OPTIONS: BudgetOnboardingDayOption[] = Array.from(
+  { length: 28 },
+  (_, index) => {
+    const value = index + 1;
+    return { value, label: String(value) };
+  },
+);
 
 export function buildBudgetOnboardingFormSpec(input: {
   sessionId: string;
@@ -58,8 +58,7 @@ export function buildBudgetOnboardingFormSpec(input: {
           timezone: input.draft?.timezone ?? "UTC",
           cadenceOptions: CADENCE_OPTIONS,
           weekdayOptions: [...ISO_WEEKDAY_OPTIONS],
-          monthlyDayMin: 1,
-          monthlyDayMax: 28,
+          monthlyDayOptions: MONTHLY_DAY_OPTIONS,
         },
         children: [],
       },

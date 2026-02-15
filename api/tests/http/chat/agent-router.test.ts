@@ -11,7 +11,7 @@ import { ensureIndexes as ensureOnboardingIndexes } from "../../../src/onboardin
 import { startBudgetOnboarding } from "../../../src/onboarding/service";
 import {
   isBudgetOnboardingStartIntent,
-  maybeRouteToBudgetOnboarding,
+  routeBudgetOnboardingIfApplicable,
 } from "../../../src/http/chat/agent-router";
 
 const decoder = new TextDecoder();
@@ -94,7 +94,7 @@ describe("budget onboarding agent router", () => {
 
   test("routes /new budget into onboarding and returns onboarding form data part", async () => {
     const userId = "ps_router_new_budget";
-    const response = await maybeRouteToBudgetOnboarding({
+    const response = await routeBudgetOnboardingIfApplicable({
       headers: { "access-control-allow-origin": "*" },
       lastMessageText: "/new budget",
       messages: [
@@ -130,7 +130,7 @@ describe("budget onboarding agent router", () => {
     const userId = "ps_router_submit_budget";
     const started = await startBudgetOnboarding({ userId });
 
-    const response = await maybeRouteToBudgetOnboarding({
+    const response = await routeBudgetOnboardingIfApplicable({
       headers: { "access-control-allow-origin": "*" },
       lastMessageText: "",
       messages: [
@@ -181,7 +181,7 @@ describe("budget onboarding agent router", () => {
     const userId = "ps_router_slash_passthrough";
     await startBudgetOnboarding({ userId });
 
-    const response = await maybeRouteToBudgetOnboarding({
+    const response = await routeBudgetOnboardingIfApplicable({
       headers: { "access-control-allow-origin": "*" },
       lastMessageText: "/logout",
       messages: [

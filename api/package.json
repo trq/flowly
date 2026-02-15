@@ -12,6 +12,7 @@
     "test": "bun test"
   },
   "dependencies": {
+    "@flowly/contracts": "workspace:*",
     "@openrouter/ai-sdk-provider": "^2.2.3",
     "ai": "^6.0.79",
     "jose": "^6.1.3",

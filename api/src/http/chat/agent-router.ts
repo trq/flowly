@@ -3,11 +3,14 @@ import {
   createUIMessageStreamResponse,
   type UIMessage,
 } from "ai";
-import type { PayCycleCadence } from "../../budgets/store";
+import type {
+  BudgetOnboardingCadence,
+  BudgetOnboardingSubmitData,
+} from "@flowly/contracts/onboarding";
 import { findActiveSessionByUserId } from "../../onboarding/store";
 import {
   startBudgetOnboarding,
-  submitBudgetOnboardingBasics,
+  submitInitialBudgetOnboarding,
 } from "../../onboarding/service";
 import { buildBudgetOnboardingFormSpec } from "../../onboarding/ui-spec";
 
@@ -16,7 +19,7 @@ type ParsedSlash = {
   args: string;
 } | null;
 
-type MaybeRouteToBudgetOnboardingInput = {
+type RouteBudgetOnboardingInput = {
   headers: Record<string, string>;
   messages: UIMessage[];
   lastMessageText: string;
@@ -24,19 +27,11 @@ type MaybeRouteToBudgetOnboardingInput = {
   userId: string | null;
 };
 
-type BudgetOnboardingSubmitData = {
-  sessionId: string;
-  name: string;
-  cadence: PayCycleCadence;
-  day: number;
-  timezone: string;
-};
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
-function isCadence(value: unknown): value is PayCycleCadence {
+function isCadence(value: unknown): value is BudgetOnboardingCadence {
   return (
     value === "weekly" ||
     value === "fortnightly" ||
@@ -132,8 +127,8 @@ function isNewBudgetSlash(parsedSlash: ParsedSlash): boolean {
   );
 }
 
-export async function maybeRouteToBudgetOnboarding(
-  input: MaybeRouteToBudgetOnboardingInput,
+export async function routeBudgetOnboardingIfApplicable(
+  input: RouteBudgetOnboardingInput,
 ): Promise<Response | null> {
   const submitAction = readSubmitAction(input.messages[input.messages.length - 1]);
   if (submitAction) {
@@ -145,7 +140,7 @@ export async function maybeRouteToBudgetOnboarding(
     }
 
     try {
-      await submitBudgetOnboardingBasics({
+      await submitInitialBudgetOnboarding({
         userId: input.userId,
         sessionId: submitAction.sessionId,
         name: submitAction.name,

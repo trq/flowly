@@ -1,28 +1,17 @@
 import { useMemo, useState } from "react";
 import type { ComponentRenderProps } from "@json-render/react";
+import type { BudgetOnboardingFormSpecProps } from "@flowly/contracts/onboarding";
 import { Button } from "@/components/ui/button";
 import {
   FLOWLY_BUDGET_ONBOARDING_SUBMIT_EVENT,
   type BudgetOnboardingSubmitPayload,
 } from "./events";
 
-type Cadence = "weekly" | "fortnightly" | "monthly";
-
-type BudgetOnboardingFormProps = {
-  sessionId: string;
-  name: string;
-  cadence: Cadence;
-  day: number;
-  timezone: string;
-  cadenceOptions: Array<{ value: Cadence; label: string }>;
-  weekdayOptions: Array<{ value: number; label: string }>;
-  monthlyDayMin: number;
-  monthlyDayMax: number;
-};
+type Cadence = BudgetOnboardingFormSpecProps["cadence"];
 
 export function BudgetOnboardingForm({
   element,
-}: ComponentRenderProps<BudgetOnboardingFormProps>) {
+}: ComponentRenderProps<BudgetOnboardingFormSpecProps>) {
   const {
     sessionId,
     name: initialName,
@@ -31,8 +20,7 @@ export function BudgetOnboardingForm({
     timezone: initialTimezone,
     cadenceOptions,
     weekdayOptions,
-    monthlyDayMin,
-    monthlyDayMax,
+    monthlyDayOptions,
   } = element.props;
 
   const [name, setName] = useState(initialName);
@@ -42,17 +30,11 @@ export function BudgetOnboardingForm({
 
   const dayOptions = useMemo(() => {
     if (cadence === "monthly") {
-      return Array.from(
-        { length: monthlyDayMax - monthlyDayMin + 1 },
-        (_, index) => {
-          const value = monthlyDayMin + index;
-          return { value, label: String(value) };
-        },
-      );
+      return monthlyDayOptions;
     }
 
     return weekdayOptions;
-  }, [cadence, weekdayOptions, monthlyDayMax, monthlyDayMin]);
+  }, [cadence, weekdayOptions, monthlyDayOptions]);
 
   return (
     <form
@@ -101,7 +83,11 @@ export function BudgetOnboardingForm({
             onChange={(event) => {
               const nextCadence = event.currentTarget.value as Cadence;
               setCadence(nextCadence);
-              setDay(nextCadence === "monthly" ? monthlyDayMin : weekdayOptions[0]!.value);
+              setDay(
+                nextCadence === "monthly"
+                  ? monthlyDayOptions[0]!.value
+                  : weekdayOptions[0]!.value,
+              );
             }}
             value={cadence}
           >

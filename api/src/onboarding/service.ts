@@ -22,7 +22,7 @@ type StartBudgetOnboardingInput = {
   userId: string;
 };
 
-type SubmitBudgetOnboardingBasicsInput = {
+type SubmitInitialBudgetOnboardingInput = {
   userId: string;
   sessionId: string;
   name: string;
@@ -43,7 +43,7 @@ type StartBudgetOnboardingResult = {
   draft: BudgetOnboardingSessionDoc["draft"];
 };
 
-type SubmitBudgetOnboardingBasicsResult = {
+type SubmitInitialBudgetOnboardingResult = {
   sessionId: string;
   budgetId: string;
   payCycleId: string;
@@ -120,9 +120,9 @@ export async function startBudgetOnboarding(
   };
 }
 
-export async function submitBudgetOnboardingBasics(
-  input: SubmitBudgetOnboardingBasicsInput,
-): Promise<SubmitBudgetOnboardingBasicsResult> {
+export async function submitInitialBudgetOnboarding(
+  input: SubmitInitialBudgetOnboardingInput,
+): Promise<SubmitInitialBudgetOnboardingResult> {
   assertUserId(input.userId);
   validateBudgetName(input.name);
   validateTimezone(input.timezone);

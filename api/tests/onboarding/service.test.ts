@@ -4,7 +4,7 @@ import { connectDb, disconnectDb, getDb } from "../../src/db/client";
 import { ensureIndexes as ensureEventIndexes } from "../../src/events/store";
 import {
   startBudgetOnboarding,
-  submitBudgetOnboardingBasics,
+  submitInitialBudgetOnboarding,
   cancelBudgetOnboarding,
 } from "../../src/onboarding/service";
 import {
@@ -45,12 +45,12 @@ describe("budget onboarding service", () => {
     expect(first.status).toBe("active");
   });
 
-  test("submitBudgetOnboardingBasics validates day rules", async () => {
+  test("submitInitialBudgetOnboarding validates day rules", async () => {
     const userId = "ps_tdd_user_2";
     const started = await startBudgetOnboarding({ userId });
 
     await expect(
-      submitBudgetOnboardingBasics({
+      submitInitialBudgetOnboarding({
         userId,
         sessionId: started.sessionId,
         name: "Budget 2026",
@@ -61,11 +61,11 @@ describe("budget onboarding service", () => {
     ).rejects.toThrow();
   });
 
-  test("submitBudgetOnboardingBasics creates budget + pay cycle and completes session", async () => {
+  test("submitInitialBudgetOnboarding creates budget + pay cycle and completes session", async () => {
     const userId = "ps_tdd_user_3";
     const started = await startBudgetOnboarding({ userId });
 
-    const result = await submitBudgetOnboardingBasics({
+    const result = await submitInitialBudgetOnboarding({
       userId,
       sessionId: started.sessionId,
       name: "Budget 2026",
