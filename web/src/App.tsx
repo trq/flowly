@@ -6,17 +6,65 @@ import { FLOWLY_EVENT_NAME } from '@/lib/events'
 import { isSessionLogoutEvent } from '@/components/layout/events'
 
 const rawApiBaseUrl = import.meta.env.VITE_API_URL?.trim().replace(/\/$/, '')
-const eventsApiPath = rawApiBaseUrl ? `${rawApiBaseUrl}/events` : '/events'
+const eventsApiBasePath = rawApiBaseUrl ? `${rawApiBaseUrl}/events` : '/events'
+
+function isIdentityExpired(params: {
+  claimsExp: number | null
+  expiresIn?: number
+  receivedAt?: number
+}): boolean {
+  const nowMs = Date.now()
+  const nowSeconds = Math.floor(nowMs / 1000)
+
+  if (typeof params.claimsExp === 'number') {
+    return params.claimsExp <= nowSeconds
+  }
+
+  if (
+    typeof params.expiresIn === 'number' &&
+    Number.isFinite(params.expiresIn) &&
+    typeof params.receivedAt === 'number' &&
+    Number.isFinite(params.receivedAt)
+  ) {
+    return params.receivedAt + params.expiresIn * 1000 <= nowMs
+  }
+
+  return false
+}
 
 export default function App() {
-  const { identity, loading, signIn, clearIdentity } = useShooAuth()
+  const { identity, claims, loading, signIn, clearIdentity } = useShooAuth()
 
   const handleLogout = useCallback(() => clearIdentity(), [clearIdentity])
 
   useEffect(() => {
-    if (!identity.userId) return
+    if (!identity.userId || !identity.token) return
+    if (
+      !isIdentityExpired({
+        claimsExp: typeof claims?.exp === 'number' ? claims.exp : null,
+        expiresIn: identity.expiresIn,
+        receivedAt: identity.receivedAt,
+      })
+    ) {
+      return
+    }
 
-    const eventSource = new EventSource(eventsApiPath)
+    clearIdentity()
+  }, [
+    claims?.exp,
+    clearIdentity,
+    identity.expiresIn,
+    identity.receivedAt,
+    identity.token,
+    identity.userId,
+  ])
+
+  useEffect(() => {
+    if (!identity.userId || !identity.token) return
+
+    const eventSource = new EventSource(
+      `${eventsApiBasePath}?access_token=${encodeURIComponent(identity.token)}`
+    )
 
     eventSource.onmessage = (event) => {
       let parsed: unknown
@@ -39,7 +87,7 @@ export default function App() {
     return () => {
       eventSource.close()
     }
-  }, [identity.userId])
+  }, [identity.userId, identity.token])
 
   useEffect(() => {
     if (!identity.userId) return
@@ -61,7 +109,7 @@ export default function App() {
     )
   }
 
-  if (!identity.userId) {
+  if (!identity.userId || !identity.token) {
     return (
       <div className="dark flex min-h-screen flex-col items-center justify-center gap-4 bg-(--page-bg)">
         <h1 className="text-2xl font-semibold text-(--foreground)">Welcome to Flowly</h1>

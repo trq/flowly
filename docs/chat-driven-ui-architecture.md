@@ -4,6 +4,8 @@
 
 Keep the app chat-first while allowing non-chat UI updates (like metric cards) with minimal coupling.
 
+For guided flows (like budget onboarding), allow chat responses to include structured `json-render` UI specs while keeping SSE events as the source of truth for state.
+
 ## Core Shape
 
 - One write endpoint: `POST /chat`
@@ -27,6 +29,7 @@ flowchart LR
     Chat["POST /chat"]
     Events["GET /events (SSE)"]
     Commands["Slash Command Handler"]
+    Agent["Onboarding Agent"]
     Domain["Domain Event Publisher"]
   end
 
@@ -35,7 +38,9 @@ flowchart LR
   App -->|message turns| Chat
   Chat -->|UI message stream| App
   Chat --> LLM
+  Chat --> Agent
   LLM --> Chat
+  Agent --> Chat
 
   App -->|open once per page load| Events
   Events -->|typed app events| Router
@@ -43,6 +48,7 @@ flowchart LR
   Router --> Mets
 
   Chat --> Commands
+  Commands --> Agent
   Commands --> Domain
   Domain --> Events
 ```
@@ -52,8 +58,9 @@ flowchart LR
 ### `POST /chat`
 
 - Accepts user message turns
-- Handles chat logic (LLM call, slash command interception, tool execution)
+- Handles chat logic (LLM/agent routing, slash command interception, tool execution)
 - Streams assistant responses back to the chat UI transport
+- Can stream structured UI specs (for example `json-render` onboarding forms) as typed message parts
 - Can emit side effects as app events (for `/events`) when needed
 
 ### `GET /events` (SSE)
@@ -74,6 +81,14 @@ The event bus is Mongo-backed for durability and still uses in-memory pub/sub fo
 - `publish()` assigns a monotonic `seq`, persists to `events`, then fans out to subscribers
 - `/events` combines startup snapshots + DB replay + live in-memory fan-out
 - Startup snapshots are regenerated on each connection and are not replayed from storage
+
+## UI Specs vs State Truth
+
+Two streams can drive the same panel, but they have different roles:
+
+- `POST /chat` stream: immediate conversational output, including agent-generated `json-render` UI specs.
+- `GET /events` SSE: canonical state transitions and snapshots (`onboarding.*`, `budgets.*`, etc.).
+- Client rendering rule: treat chat UI specs as projections; reconcile to SSE state for truth and reconnect recovery.
 
 ```mermaid
 flowchart LR
@@ -162,6 +177,7 @@ flowchart TB
 
 - Keeps `useChat` and chat streaming behavior straightforward
 - Avoids mixing all UI state into chat transcript state
+- Enables rich in-chat UI generation from agents without promoting chat payloads to canonical state
 - Supports future actions like metric preview/commit without changing core chat transport
 - Lets each panel update independently while sharing one stream
 
@@ -169,4 +185,5 @@ flowchart TB
 
 - Show a conversation notice (for example, guidance to run a command)
 - Add/update/remove metric cards without forcing a chat response
+- Stream a budget onboarding form spec from the onboarding agent and reconcile it with `onboarding.*` SSE events
 - Surface backend system notices even when no prompt is submitted
