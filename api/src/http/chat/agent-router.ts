@@ -9,10 +9,11 @@ import type {
 } from "@flowly/contracts/onboarding";
 import {
   runBudgetOnboardingAgentStart,
+  runBudgetOnboardingAgentSubmit,
   type BudgetOnboardingAgentStartResult,
+  type BudgetOnboardingAgentSubmitResult,
 } from "../../agents/budget-onboarding-agent";
 import { findActiveSessionByUserId } from "../../onboarding/store";
-import { submitInitialBudgetOnboarding } from "../../onboarding/service";
 import { buildBudgetOnboardingFormSpec } from "../../onboarding/ui-spec";
 
 type ParsedSlash = {
@@ -30,6 +31,11 @@ type RouteBudgetOnboardingInput = {
     userId: string;
     prompt: string;
   }) => Promise<BudgetOnboardingAgentStartResult>;
+  runSubmitWithAgent?: (input: {
+    userId: string;
+    prompt: string;
+    submit: BudgetOnboardingSubmitData;
+  }) => Promise<BudgetOnboardingAgentSubmitResult>;
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -145,19 +151,21 @@ export async function routeBudgetOnboardingIfApplicable(
     }
 
     try {
-      await submitInitialBudgetOnboarding({
+      const submitted = await (input.runSubmitWithAgent ??
+        runBudgetOnboardingAgentSubmit)({
         userId: input.userId,
-        sessionId: submitAction.sessionId,
-        name: submitAction.name,
-        cadence: submitAction.cadence,
-        day: submitAction.day,
-        timezone: submitAction.timezone,
+        prompt: "Submit budget onboarding basics.",
+        submit: submitAction,
       });
 
-      return streamAssistantMessage(
-        input.headers,
-        "Budget created. Next we can set up pools and categories.",
-      );
+      if (submitted.status === "completed") {
+        return streamAssistantMessage(input.headers, submitted.text);
+      }
+
+      return streamAssistantMessage(input.headers, submitted.text, {
+        sessionId: submitted.sessionId,
+        spec: submitted.spec,
+      });
     } catch (error) {
       const message =
         error instanceof Error

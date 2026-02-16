@@ -8,7 +8,10 @@ import {
 import { ensureIndexes as ensureEventIndexes } from "../../../src/events/store";
 import { ensureIndexes as ensureBudgetIndexes } from "../../../src/budgets/store";
 import { ensureIndexes as ensureOnboardingIndexes } from "../../../src/onboarding/store";
-import { startBudgetOnboarding } from "../../../src/onboarding/service";
+import {
+  startBudgetOnboarding,
+  submitInitialBudgetOnboarding,
+} from "../../../src/onboarding/service";
 import { buildBudgetOnboardingFormSpec } from "../../../src/onboarding/ui-spec";
 import {
   isBudgetOnboardingStartIntent,
@@ -146,6 +149,7 @@ describe("budget onboarding agent router", () => {
   test("accepts a structured onboarding submit action and persists budget + pay cycle", async () => {
     const userId = "ps_router_submit_budget";
     const started = await startBudgetOnboarding({ userId });
+    let invoked = false;
 
     const response = await routeBudgetOnboardingIfApplicable({
       headers: { "access-control-allow-origin": "*" },
@@ -170,8 +174,29 @@ describe("budget onboarding agent router", () => {
       ],
       parsedSlash: null,
       userId,
+      runSubmitWithAgent: async ({
+        submit,
+        userId: agentUserId,
+      }) => {
+        invoked = true;
+
+        await submitInitialBudgetOnboarding({
+          userId: agentUserId,
+          sessionId: submit.sessionId,
+          name: submit.name,
+          cadence: submit.cadence,
+          day: submit.day,
+          timezone: submit.timezone,
+        });
+
+        return {
+          status: "completed",
+          text: "Budget created. Next we can set up pools and categories.",
+        };
+      },
     });
 
+    expect(invoked).toBe(true);
     expect(response).toBeInstanceOf(Response);
     await collectUiChunks(response!, 3);
 
