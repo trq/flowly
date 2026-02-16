@@ -1,7 +1,7 @@
 import { DefaultChatTransport } from "ai";
 import { useChat } from "@ai-sdk/react";
 import type { Spec } from "@json-render/react";
-import { MessageSquareIcon } from "lucide-react";
+import { LoaderCircleIcon, MessageSquareIcon } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useShooAuth } from "@shoojs/react";
 import {
@@ -250,13 +250,15 @@ export default function Conversation() {
     : null;
   const hasActiveOnboardingForm =
     Boolean(effectiveOnboardingSessionId) && Boolean(activeOnboardingSpec);
+  const isAwaitingResponse =
+    status === "submitted" || status === "streaming";
 
   const showMenu = input.startsWith("/");
   const query = showMenu ? input.slice(1).toLowerCase() : "";
 
   return (
     <section className="h-full min-h-64 px-2 pt-0 pb-4">
-      <Card className="flowly-conversation flowly-surface flex h-full min-h-[32rem] flex-col">
+      <Card className="flowly-conversation flowly-surface relative flex h-full min-h-[32rem] flex-col">
         <AIConversation className="relative min-h-0">
           <ConversationContent>
             {textMessages.length === 0 && !hasActiveOnboardingForm ? (
@@ -345,6 +347,19 @@ export default function Conversation() {
             </PromptInputFooter>
           </PromptInput>
         </div>
+
+        {isAwaitingResponse && (
+          <div className="absolute inset-0 z-30 flex items-center justify-center rounded-xl bg-black/20 backdrop-blur-[1px]">
+            <div
+              aria-label="Processing request"
+              className="flex items-center gap-2 rounded-md border border-slate-700 bg-slate-950/90 px-3 py-2 text-sm text-slate-100 shadow-lg"
+              role="status"
+            >
+              <LoaderCircleIcon className="size-4 animate-spin" />
+              <span>Processing request</span>
+            </div>
+          </div>
+        )}
       </Card>
     </section>
   );

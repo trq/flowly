@@ -6,6 +6,7 @@ import { FLOWLY_EVENT_NAME } from "@/lib/events";
 const sendMessage = vi.fn();
 const stop = vi.fn();
 let mockMessages: Array<Record<string, unknown>> = [];
+let mockStatus = "ready";
 
 vi.mock("@shoojs/react", () => ({
   useShooAuth: () => ({
@@ -20,7 +21,7 @@ vi.mock("@ai-sdk/react", () => ({
   useChat: () => ({
     messages: mockMessages,
     sendMessage,
-    status: "ready",
+    status: mockStatus,
     stop,
   }),
 }));
@@ -82,6 +83,7 @@ describe("Conversation onboarding", () => {
     sendMessage.mockClear();
     stop.mockClear();
     mockMessages = [buildBudgetOnboardingAssistantMessage()];
+    mockStatus = "ready";
   });
 
   test("renders onboarding form from json-render data part and sends structured submit payload", async () => {
@@ -173,5 +175,14 @@ describe("Conversation onboarding", () => {
     await waitFor(() => {
       expect(screen.queryByLabelText("Budget name")).toBeNull();
     });
+  });
+
+  test("shows a chat loading overlay while waiting for a response", () => {
+    mockStatus = "submitted";
+    render(<Conversation />);
+
+    expect(
+      screen.getByRole("status", { name: "Processing request" }),
+    ).toBeDefined();
   });
 });
