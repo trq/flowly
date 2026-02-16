@@ -185,4 +185,37 @@ describe("Conversation onboarding", () => {
       screen.getByRole("status", { name: "Processing request" }),
     ).toBeDefined();
   });
+
+  test("selecting a slash command inserts it into input instead of sending immediately", async () => {
+    const user = userEvent.setup();
+    render(<Conversation />);
+
+    window.dispatchEvent(
+      new CustomEvent(FLOWLY_EVENT_NAME, {
+        detail: {
+          channel: "commands",
+          type: "commands.snapshot",
+          payload: {
+            commands: [
+              { name: "logout", description: "Sign out of Flowly" },
+              { name: "new", description: "Create new resources" },
+            ],
+          },
+        },
+      }),
+    );
+
+    const input = screen
+      .getAllByPlaceholderText("Ask me about your budget...")
+      .at(-1) as HTMLTextAreaElement;
+    await user.type(input, "/");
+    await user.keyboard("{Enter}");
+
+    expect(sendMessage).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        text: "/logout",
+      }),
+    );
+    expect(input.value).toBe("/logout ");
+  });
 });

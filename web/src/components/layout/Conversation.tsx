@@ -311,8 +311,7 @@ export default function Conversation() {
               commands={commands}
               query={query}
               onSelect={(name) => {
-                sendMessage({ text: `/${name}` });
-                setInput("");
+                setInput(`/${name} `);
               }}
             />
           )}
