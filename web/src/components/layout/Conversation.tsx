@@ -42,6 +42,12 @@ import SlashCommandMenu, {
   type SlashCommandMenuHandle,
 } from "./SlashCommandMenu";
 
+type MessageWithParts = {
+  id: string;
+  role: "assistant" | "user" | "system";
+  parts: Array<{ type: string; text?: string }>;
+};
+
 const rawApiBaseUrl = import.meta.env.VITE_API_URL?.trim().replace(/\/$/, "");
 const chatApiPath = rawApiBaseUrl ? `${rawApiBaseUrl}/chat` : "/chat";
 
@@ -95,6 +101,9 @@ export default function Conversation() {
   const [activeOnboardingSessionId, setActiveOnboardingSessionId] = useState<
     string | null
   >(null);
+  const [closedOnboardingSessionIds, setClosedOnboardingSessionIds] = useState<
+    Record<string, true>
+  >({});
   const [onboardingSpecsBySessionId, setOnboardingSpecsBySessionId] = useState<
     Record<string, Spec>
   >({});
@@ -129,6 +138,14 @@ export default function Conversation() {
 
       if (isOnboardingSnapshotEvent(detail) || isOnboardingStartedEvent(detail)) {
         setActiveOnboardingSessionId(detail.payload.sessionId);
+        setClosedOnboardingSessionIds((previous) => {
+          if (!(detail.payload.sessionId in previous)) {
+            return previous;
+          }
+          const next = { ...previous };
+          delete next[detail.payload.sessionId];
+          return next;
+        });
 
         const uiSpec = detail.payload.uiSpec;
         if (isSpec(uiSpec)) {
@@ -144,6 +161,10 @@ export default function Conversation() {
         setActiveOnboardingSessionId((previous) =>
           previous === detail.payload.sessionId ? null : previous,
         );
+        setClosedOnboardingSessionIds((previous) => ({
+          ...previous,
+          [detail.payload.sessionId]: true,
+        }));
         setOnboardingSpecsBySessionId((previous) => {
           const next = { ...previous };
           delete next[detail.payload.sessionId];
@@ -184,7 +205,9 @@ export default function Conversation() {
         const parsed = readOnboardingFormPart(part);
         if (!parsed) continue;
         result[parsed.sessionId] = parsed.spec;
-        latestSessionId = parsed.sessionId;
+        if (!(parsed.sessionId in closedOnboardingSessionIds)) {
+          latestSessionId = parsed.sessionId;
+        }
       }
       return result;
     }, {});
@@ -193,7 +216,29 @@ export default function Conversation() {
       bySessionId,
       latestSessionId,
     };
-  }, [messages]);
+  }, [closedOnboardingSessionIds, messages]);
+
+  const textMessages = useMemo(
+    () =>
+      messages.reduce<MessageWithParts[]>((result, message) => {
+        const textParts = message.parts.filter(
+          (part): part is { type: "text"; text: string } =>
+            part.type === "text" && typeof part.text === "string" && part.text.length > 0,
+        );
+
+        if (textParts.length === 0) {
+          return result;
+        }
+
+        result.push({
+          id: message.id,
+          role: message.role,
+          parts: textParts,
+        });
+        return result;
+      }, []),
+    [messages],
+  );
 
   const effectiveOnboardingSessionId =
     activeOnboardingSessionId ?? onboardingSpecsFromMessages.latestSessionId;
@@ -203,6 +248,8 @@ export default function Conversation() {
       onboardingSpecsBySessionId[effectiveOnboardingSessionId] ??
       null
     : null;
+  const hasActiveOnboardingForm =
+    Boolean(effectiveOnboardingSessionId) && Boolean(activeOnboardingSpec);
 
   const showMenu = input.startsWith("/");
   const query = showMenu ? input.slice(1).toLowerCase() : "";
@@ -212,7 +259,7 @@ export default function Conversation() {
       <Card className="flowly-conversation flowly-surface flex h-full min-h-[32rem] flex-col">
         <AIConversation className="relative min-h-0">
           <ConversationContent>
-            {messages.length === 0 ? (
+            {textMessages.length === 0 && !hasActiveOnboardingForm ? (
               <ConversationEmptyState>
                 <div className="text-muted-foreground">
                   <MessageSquareIcon className="size-8" />
@@ -220,7 +267,7 @@ export default function Conversation() {
               </ConversationEmptyState>
             ) : (
               <>
-                {messages.map((message) => (
+                {textMessages.map((message) => (
                   <Message from={message.role} key={message.id}>
                     <MessageContent>
                       {message.parts.map((part, i) => {

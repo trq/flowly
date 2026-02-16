@@ -1,9 +1,11 @@
 import { describe, test, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { FLOWLY_EVENT_NAME } from "@/lib/events";
 
 const sendMessage = vi.fn();
 const stop = vi.fn();
+let mockMessages: Array<Record<string, unknown>> = [];
 
 vi.mock("@shoojs/react", () => ({
   useShooAuth: () => ({
@@ -16,81 +18,7 @@ vi.mock("@shoojs/react", () => ({
 
 vi.mock("@ai-sdk/react", () => ({
   useChat: () => ({
-    messages: [
-      {
-        id: "assistant-1",
-        role: "assistant",
-        parts: [
-          { type: "text", text: "Let's set up your budget." },
-          {
-            type: "data-budget-onboarding-form",
-            data: {
-              sessionId: "session-1",
-              spec: {
-                elements: {
-                  "budget-onboarding-form": {
-                    children: [],
-                    props: {
-                      cadence: "monthly",
-                      cadenceOptions: [
-                        { label: "Weekly", value: "weekly" },
-                        { label: "Fortnightly", value: "fortnightly" },
-                        { label: "Monthly", value: "monthly" },
-                      ],
-                      day: 15,
-                      monthlyDayOptions: [
-                        { label: "1", value: 1 },
-                        { label: "2", value: 2 },
-                        { label: "3", value: 3 },
-                        { label: "4", value: 4 },
-                        { label: "5", value: 5 },
-                        { label: "6", value: 6 },
-                        { label: "7", value: 7 },
-                        { label: "8", value: 8 },
-                        { label: "9", value: 9 },
-                        { label: "10", value: 10 },
-                        { label: "11", value: 11 },
-                        { label: "12", value: 12 },
-                        { label: "13", value: 13 },
-                        { label: "14", value: 14 },
-                        { label: "15", value: 15 },
-                        { label: "16", value: 16 },
-                        { label: "17", value: 17 },
-                        { label: "18", value: 18 },
-                        { label: "19", value: 19 },
-                        { label: "20", value: 20 },
-                        { label: "21", value: 21 },
-                        { label: "22", value: 22 },
-                        { label: "23", value: 23 },
-                        { label: "24", value: 24 },
-                        { label: "25", value: 25 },
-                        { label: "26", value: 26 },
-                        { label: "27", value: 27 },
-                        { label: "28", value: 28 },
-                      ],
-                      name: "",
-                      sessionId: "session-1",
-                      timezone: "America/New_York",
-                      weekdayOptions: [
-                        { label: "Mon", value: 1 },
-                        { label: "Tue", value: 2 },
-                        { label: "Wed", value: 3 },
-                        { label: "Thu", value: 4 },
-                        { label: "Fri", value: 5 },
-                        { label: "Sat", value: 6 },
-                        { label: "Sun", value: 7 },
-                      ],
-                    },
-                    type: "BudgetOnboardingForm",
-                  },
-                },
-                root: "budget-onboarding-form",
-              },
-            },
-          },
-        ],
-      },
-    ],
+    messages: mockMessages,
     sendMessage,
     status: "ready",
     stop,
@@ -99,10 +27,61 @@ vi.mock("@ai-sdk/react", () => ({
 
 import Conversation from "@/components/layout/Conversation";
 
+function buildBudgetOnboardingAssistantMessage() {
+  return {
+    id: "assistant-1",
+    role: "assistant",
+    parts: [
+      { type: "text", text: "Let's set up your budget." },
+      {
+        type: "data-budget-onboarding-form",
+        data: {
+          sessionId: "session-1",
+          spec: {
+            elements: {
+              "budget-onboarding-form": {
+                children: [],
+                props: {
+                  cadence: "monthly",
+                  cadenceOptions: [
+                    { label: "Weekly", value: "weekly" },
+                    { label: "Fortnightly", value: "fortnightly" },
+                    { label: "Monthly", value: "monthly" },
+                  ],
+                  day: 15,
+                  monthlyDayOptions: Array.from({ length: 28 }, (_, index) => ({
+                    label: String(index + 1),
+                    value: index + 1,
+                  })),
+                  name: "",
+                  sessionId: "session-1",
+                  timezone: "America/New_York",
+                  weekdayOptions: [
+                    { label: "Mon", value: 1 },
+                    { label: "Tue", value: 2 },
+                    { label: "Wed", value: 3 },
+                    { label: "Thu", value: 4 },
+                    { label: "Fri", value: 5 },
+                    { label: "Sat", value: 6 },
+                    { label: "Sun", value: 7 },
+                  ],
+                },
+                type: "BudgetOnboardingForm",
+              },
+            },
+            root: "budget-onboarding-form",
+          },
+        },
+      },
+    ],
+  };
+}
+
 describe("Conversation onboarding", () => {
   beforeEach(() => {
     sendMessage.mockClear();
     stop.mockClear();
+    mockMessages = [buildBudgetOnboardingAssistantMessage()];
   });
 
   test("renders onboarding form from json-render data part and sends structured submit payload", async () => {
@@ -128,5 +107,71 @@ describe("Conversation onboarding", () => {
         ],
       }),
     );
+  });
+
+  test("does not render an empty user bubble for structured submit-only messages", () => {
+    mockMessages = [
+      {
+        id: "user-1",
+        role: "user",
+        parts: [{ type: "text", text: "/new budget" }],
+      },
+      {
+        id: "assistant-1",
+        role: "assistant",
+        parts: [{ type: "text", text: "Starting budget onboarding." }],
+      },
+      {
+        id: "user-2",
+        role: "user",
+        parts: [
+          {
+            type: "data-budget-onboarding-submit",
+            data: {
+              sessionId: "session-1",
+              name: "2026",
+              cadence: "monthly",
+              day: 15,
+              timezone: "Australia/Sydney",
+            },
+          },
+        ],
+      },
+      {
+        id: "assistant-2",
+        role: "assistant",
+        parts: [{ type: "text", text: "Budget created." }],
+      },
+    ];
+
+    const { container } = render(<Conversation />);
+
+    expect(screen.getByText("/new budget")).toBeDefined();
+    expect(screen.getByText("Budget created.")).toBeDefined();
+    expect(container.querySelectorAll(".is-user")).toHaveLength(1);
+  });
+
+  test("removes onboarding form from chat after onboarding.completed event", async () => {
+    render(<Conversation />);
+    expect(screen.getByLabelText("Budget name")).toBeDefined();
+
+    window.dispatchEvent(
+      new CustomEvent(FLOWLY_EVENT_NAME, {
+        detail: {
+          channel: "onboarding",
+          type: "onboarding.completed",
+          payload: {
+            sessionId: "session-1",
+            userId: "ps_web_user_1",
+            status: "completed",
+            currentStep: "pools",
+          },
+        },
+      }),
+    );
+
+    await waitFor(() => {
+      expect(screen.queryByLabelText("Budget name")).toBeNull();
+    });
   });
 });
