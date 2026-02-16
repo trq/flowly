@@ -63,7 +63,7 @@ export default function App() {
     )
   }
 
-  if (!identity.userId) {
+  if (!identity.userId || !identity.token) {
     return (
       <div className="dark flex min-h-screen flex-col items-center justify-center gap-4 bg-(--page-bg)">
         <h1 className="text-2xl font-semibold text-(--foreground)">Welcome to Flowly</h1>

@@ -100,12 +100,16 @@ export default function Conversation() {
   >({});
   const menuRef = useRef<SlashCommandMenuHandle>(null);
   const { identity } = useShooAuth();
+  const authTokenRef = useRef<string | undefined>(identity.token);
+  authTokenRef.current = identity.token;
+
   const { messages, sendMessage, status, stop } = useChat({
     transport: new DefaultChatTransport({
       api: chatApiPath,
       headers: (): Record<string, string> => {
-        if (!identity.token) return {};
-        return { Authorization: `Bearer ${identity.token}` };
+        const token = authTokenRef.current;
+        if (!token) return {};
+        return { Authorization: `Bearer ${token}` };
       },
     }),
   });
