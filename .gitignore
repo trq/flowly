@@ -4,7 +4,8 @@
 node_modules/
 /web/dist
 /api/dist
-tmp/logs
+
+var
 
 # secrets
 .env

@@ -5,7 +5,7 @@ import tailwindcss from "@tailwindcss/vite";
 import { agentTail } from "agent-tail/vite";
 
 export default defineConfig({
-  plugins: [react(), tailwindcss(), agentTail()],
+  plugins: [react(), tailwindcss(), agentTail({ logDir: "../var/logs" })],
   resolve: {
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),
