@@ -1,6 +1,6 @@
 import type { Spec } from "@json-render/react"
 
-export type MetricsUpsertEvent = {
+type MetricsUpsertEvent = {
   channel: "metrics"
   payload: {
     metricId: string

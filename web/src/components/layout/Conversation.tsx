@@ -2,7 +2,7 @@ import { DefaultChatTransport } from "ai";
 import { useChat } from "@ai-sdk/react";
 import type { Spec } from "@json-render/react";
 import { LoaderCircleIcon, MessageSquareIcon } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { useShooAuth } from "@shoojs/react";
 import {
   Conversation as AIConversation,
@@ -45,7 +45,7 @@ import SlashCommandMenu, {
 type MessageWithParts = {
   id: string;
   role: "assistant" | "user" | "system";
-  parts: Array<{ type: string; text?: string }>;
+  parts: Array<{ type: string; text?: string; partKey: string }>;
 };
 
 const rawApiBaseUrl = import.meta.env.VITE_API_URL?.trim().replace(/\/$/, "");
@@ -95,18 +95,66 @@ function readOnboardingFormPart(
   };
 }
 
+// --- Onboarding state reducer ---
+
+type OnboardingState = {
+  activeSessionId: string | null;
+  closedSessionIds: Record<string, true>;
+  specsBySessionId: Record<string, Spec>;
+};
+
+type OnboardingAction =
+  | { type: "SESSION_STARTED"; sessionId: string; uiSpec?: unknown }
+  | { type: "SESSION_ENDED"; sessionId: string };
+
+const onboardingInitialState: OnboardingState = {
+  activeSessionId: null,
+  closedSessionIds: {},
+  specsBySessionId: {},
+};
+
+function onboardingReducer(
+  state: OnboardingState,
+  action: OnboardingAction,
+): OnboardingState {
+  switch (action.type) {
+    case "SESSION_STARTED": {
+      const closedSessionIds = { ...state.closedSessionIds };
+      delete closedSessionIds[action.sessionId];
+      return {
+        activeSessionId: action.sessionId,
+        closedSessionIds,
+        specsBySessionId:
+          action.uiSpec && isSpec(action.uiSpec)
+            ? { ...state.specsBySessionId, [action.sessionId]: action.uiSpec }
+            : state.specsBySessionId,
+      };
+    }
+    case "SESSION_ENDED": {
+      const specsBySessionId = { ...state.specsBySessionId };
+      delete specsBySessionId[action.sessionId];
+      return {
+        activeSessionId:
+          state.activeSessionId === action.sessionId
+            ? null
+            : state.activeSessionId,
+        closedSessionIds: {
+          ...state.closedSessionIds,
+          [action.sessionId]: true,
+        },
+        specsBySessionId,
+      };
+    }
+  }
+}
+
 export default function Conversation() {
   const [input, setInput] = useState("");
   const [commands, setCommands] = useState<CommandInfo[]>([]);
-  const [activeOnboardingSessionId, setActiveOnboardingSessionId] = useState<
-    string | null
-  >(null);
-  const [closedOnboardingSessionIds, setClosedOnboardingSessionIds] = useState<
-    Record<string, true>
-  >({});
-  const [onboardingSpecsBySessionId, setOnboardingSpecsBySessionId] = useState<
-    Record<string, Spec>
-  >({});
+  const [onboarding, dispatchOnboarding] = useReducer(
+    onboardingReducer,
+    onboardingInitialState,
+  );
   const menuRef = useRef<SlashCommandMenuHandle>(null);
   const { identity } = useShooAuth();
   const authTokenRef = useRef<string | undefined>(identity.token);
@@ -137,38 +185,18 @@ export default function Conversation() {
       }
 
       if (isOnboardingSnapshotEvent(detail) || isOnboardingStartedEvent(detail)) {
-        setActiveOnboardingSessionId(detail.payload.sessionId);
-        setClosedOnboardingSessionIds((previous) => {
-          if (!(detail.payload.sessionId in previous)) {
-            return previous;
-          }
-          const next = { ...previous };
-          delete next[detail.payload.sessionId];
-          return next;
+        dispatchOnboarding({
+          type: "SESSION_STARTED",
+          sessionId: detail.payload.sessionId,
+          uiSpec: detail.payload.uiSpec,
         });
-
-        const uiSpec = detail.payload.uiSpec;
-        if (isSpec(uiSpec)) {
-          setOnboardingSpecsBySessionId((previous) => ({
-            ...previous,
-            [detail.payload.sessionId]: uiSpec,
-          }));
-        }
         return;
       }
 
       if (isOnboardingCompletedEvent(detail) || isOnboardingCancelledEvent(detail)) {
-        setActiveOnboardingSessionId((previous) =>
-          previous === detail.payload.sessionId ? null : previous,
-        );
-        setClosedOnboardingSessionIds((previous) => ({
-          ...previous,
-          [detail.payload.sessionId]: true,
-        }));
-        setOnboardingSpecsBySessionId((previous) => {
-          const next = { ...previous };
-          delete next[detail.payload.sessionId];
-          return next;
+        dispatchOnboarding({
+          type: "SESSION_ENDED",
+          sessionId: detail.payload.sessionId,
         });
       }
     };
@@ -205,7 +233,7 @@ export default function Conversation() {
         const parsed = readOnboardingFormPart(part);
         if (!parsed) continue;
         result[parsed.sessionId] = parsed.spec;
-        if (!(parsed.sessionId in closedOnboardingSessionIds)) {
+        if (!(parsed.sessionId in onboarding.closedSessionIds)) {
           latestSessionId = parsed.sessionId;
         }
       }
@@ -216,15 +244,20 @@ export default function Conversation() {
       bySessionId,
       latestSessionId,
     };
-  }, [closedOnboardingSessionIds, messages]);
+  }, [onboarding.closedSessionIds, messages]);
 
   const textMessages = useMemo(
     () =>
       messages.reduce<MessageWithParts[]>((result, message) => {
-        const textParts = message.parts.filter(
-          (part): part is { type: "text"; text: string } =>
-            part.type === "text" && typeof part.text === "string" && part.text.length > 0,
-        );
+        const textParts = message.parts
+          .filter(
+            (part): part is { type: "text"; text: string } =>
+              part.type === "text" && typeof part.text === "string" && part.text.length > 0,
+          )
+          .map((part, partIndex) => ({
+            ...part,
+            partKey: `${message.id}-part-${partIndex}`,
+          }));
 
         if (textParts.length === 0) {
           return result;
@@ -241,11 +274,11 @@ export default function Conversation() {
   );
 
   const effectiveOnboardingSessionId =
-    activeOnboardingSessionId ?? onboardingSpecsFromMessages.latestSessionId;
+    onboarding.activeSessionId ?? onboardingSpecsFromMessages.latestSessionId;
 
   const activeOnboardingSpec = effectiveOnboardingSessionId
     ? onboardingSpecsFromMessages.bySessionId[effectiveOnboardingSessionId] ??
-      onboardingSpecsBySessionId[effectiveOnboardingSessionId] ??
+      onboarding.specsBySessionId[effectiveOnboardingSessionId] ??
       null
     : null;
   const hasActiveOnboardingForm =
@@ -272,11 +305,11 @@ export default function Conversation() {
                 {textMessages.map((message) => (
                   <Message from={message.role} key={message.id}>
                     <MessageContent>
-                      {message.parts.map((part, i) => {
+                      {message.parts.map((part) => {
                         switch (part.type) {
                           case "text":
                             return (
-                              <MessageResponse key={`${message.id}-${i}`}>
+                              <MessageResponse key={part.partKey}>
                                 {part.text}
                               </MessageResponse>
                             );

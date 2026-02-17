@@ -48,9 +48,7 @@ export function BudgetOnboardingForm({
   return (
     <form
       className="mt-3 space-y-3 rounded-md border border-zinc-800 bg-zinc-900/40 p-3"
-      onSubmit={(event) => {
-        event.preventDefault();
-
+      action={() => {
         const payload: BudgetOnboardingSubmitPayload = {
           sessionId,
           name,

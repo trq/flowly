@@ -1,4 +1,4 @@
-export type SessionLogoutEvent = {
+type SessionLogoutEvent = {
   channel: "session"
   type: "session.logout"
 }
@@ -8,13 +8,13 @@ export type CommandInfo = {
   description: string
 }
 
-export type CommandsSnapshotEvent = {
+type CommandsSnapshotEvent = {
   channel: "commands"
   type: "commands.snapshot"
   payload: { commands: CommandInfo[] }
 }
 
-export type OnboardingSnapshotEvent = {
+type OnboardingSnapshotEvent = {
   channel: "onboarding"
   type: "onboarding.snapshot"
   payload: {
@@ -27,7 +27,7 @@ export type OnboardingSnapshotEvent = {
   }
 }
 
-export type OnboardingStartedEvent = {
+type OnboardingStartedEvent = {
   channel: "onboarding"
   type: "onboarding.started"
   payload: {
@@ -40,7 +40,7 @@ export type OnboardingStartedEvent = {
   }
 }
 
-export type OnboardingCompletedEvent = {
+type OnboardingCompletedEvent = {
   channel: "onboarding"
   type: "onboarding.completed"
   payload: {
@@ -51,7 +51,7 @@ export type OnboardingCompletedEvent = {
   }
 }
 
-export type OnboardingCancelledEvent = {
+type OnboardingCancelledEvent = {
   channel: "onboarding"
   type: "onboarding.cancelled"
   payload: {

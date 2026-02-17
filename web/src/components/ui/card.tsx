@@ -25,26 +25,19 @@ function CardHeader({ className, ...props }: React.ComponentProps<"div">) {
   );
 }
 
-function CardTitle({ className, ...props }: React.ComponentProps<"h3">) {
+function CardTitle({
+  className,
+  children,
+  ...props
+}: React.ComponentProps<"h3">) {
   return (
     <h3
       data-slot="card-title"
       className={cn("text-sm font-medium text-zinc-100", className)}
       {...props}
-    />
-  );
-}
-
-function CardDescription({
-  className,
-  ...props
-}: React.ComponentProps<"p">) {
-  return (
-    <p
-      data-slot="card-description"
-      className={cn("text-xs text-zinc-400", className)}
-      {...props}
-    />
+    >
+      {children}
+    </h3>
   );
 }
 
@@ -52,4 +45,4 @@ function CardContent({ className, ...props }: React.ComponentProps<"div">) {
   return <div data-slot="card-content" className={cn("p-4", className)} {...props} />;
 }
 
-export { Card, CardContent, CardDescription, CardHeader, CardTitle };
+export { Card, CardContent, CardHeader, CardTitle };
