@@ -2,6 +2,12 @@
 
 Chat-driven personal finance app. Bun monorepo: `web/` (React + Vite) and `api/` (Bun HTTP server).
 
+## Important
+
+This is a pre-production work in progress and we do not care about making any breaking changes or leaving any prior implementations to "fall back to". We
+also do not care about changing any database schemas or type definition interfaces. This is a brand new application that is still very much in the early
+stages of development and as such is allowed to be in a state of flux.
+
 ## Documentation
 
 Read the docs before making architectural decisions:
