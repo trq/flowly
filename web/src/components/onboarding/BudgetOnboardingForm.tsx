@@ -26,7 +26,16 @@ export function BudgetOnboardingForm({
   const [name, setName] = useState(initialName);
   const [cadence, setCadence] = useState<Cadence>(initialCadence);
   const [day, setDay] = useState(initialDay);
-  const [timezone, setTimezone] = useState(initialTimezone);
+  const [timezone, setTimezone] = useState(() =>
+    initialTimezone === "UTC"
+      ? Intl.DateTimeFormat().resolvedOptions().timeZone
+      : initialTimezone,
+  );
+
+  const timezoneOptions = useMemo(
+    () => Intl.supportedValuesOf("timeZone"),
+    [],
+  );
 
   const dayOptions = useMemo(() => {
     if (cadence === "monthly") {
@@ -125,12 +134,18 @@ export function BudgetOnboardingForm({
         >
           Timezone
         </label>
-        <input
+        <select
           className="w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm"
           id={`budget-timezone-${sessionId}`}
           onChange={(event) => setTimezone(event.currentTarget.value)}
           value={timezone}
-        />
+        >
+          {timezoneOptions.map((tz) => (
+            <option key={tz} value={tz}>
+              {tz.replaceAll("_", " ")}
+            </option>
+          ))}
+        </select>
       </div>
 
       <div className="flex justify-end">
